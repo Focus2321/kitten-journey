@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+/* Kitten Journey tokens — mirrored from the Paper file and mobile/src/theme/tokens.ts */
+@theme {
+  --color-ground: #ffffff;
+  --color-surface: #f4f3ef;
+  --color-line: #e7e5df;
+  --color-ink: #15130f;
+  --color-muted: #6e6a62;
+  --color-sun: #ffce3a;
+  --color-sun-soft: #fff4cc;
+  --color-paw: #ffa7b4;
+  --color-paw-soft: #ffe6ea;
+  --color-night: #15130f;
+
+  --font-sans: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
+
+  --tracking-display: -0.045em;
+  --tracking-title: -0.02em;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-phone: 0 40px 80px -30px rgb(21 19 15 / 0.35), 0 12px 30px -12px rgb(21 19 15 / 0.2);
+  --shadow-card: 0 18px 40px -22px rgb(21 19 15 / 0.28);
+}
+
+@layer base {
+  html {
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-sun);
+    color: var(--color-ink);
+  }
+  body {
+    overflow-x: clip;
+  }
+}
+
+@utility display {
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+@utility lead {
+  font-size: 1.1875rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+  text-wrap: pretty;
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
