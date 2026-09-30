@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { daysBetween, formatTime } from '@/data/dates';
-import type { PhotoKey } from '@/data/photos';
+import type { Photo } from '@/data/photos';
 import { displayName, firstsFor, momentsFor, useStore, weightsFor, type Kitten, type Moment, type Mother, type NewHome, type Weight } from '@/data/store';
 
 /** What the owner chose to send along. Encoded into the `/shared/[id]?include=` param. */
@@ -24,9 +24,6 @@ export function decodeInclude(raw: string | string[] | undefined): Include {
   const on = new Set(s.split(',').filter(Boolean));
   return { photos: on.has('photos'), firsts: on.has('firsts'), growth: on.has('growth'), family: on.has('family') };
 }
-
-/** Fake, stable share link. */
-export const shareLink = (kittenId: string) => `https://kittenjourney.app/s/${kittenId}-7f3k`;
 
 export type Pronouns = { subj: string; Subj: string; obj: string; poss: string; Poss: string; is: string };
 
@@ -70,9 +67,10 @@ export type Story = {
   /** Newest first, firsts excluded — "lately". */
   moments: Moment[];
   /** Unique photos of this kitten (own photo, own moments, litter moments). */
-  photoKeys: PhotoKey[];
+  photoKeys: Photo[];
   /** Note from the family, shown under "This is Pip." */
   note: string;
+  /** Only what the family wrote down — empty when nothing was entered. */
   loves: string;
   /** "his mouse" / "a soft blanket" — used in the first-week tips. */
   comfort: string;
@@ -94,8 +92,8 @@ export function buildStory(s: StoreSlice, id: string): Story | null {
   const firsts = firstsFor(s.moments, id);
   const moments = momentsFor(s.moments, id).filter((m) => !m.first);
 
-  const photoKeys: PhotoKey[] = [];
-  const push = (p: PhotoKey | null) => {
+  const photoKeys: Photo[] = [];
+  const push = (p: Photo | null) => {
     if (p && !photoKeys.includes(p)) photoKeys.push(p);
   };
   push(kitten.photo);
@@ -129,7 +127,7 @@ export function buildStory(s: StoreSlice, id: string): Story | null {
     moments,
     photoKeys,
     note,
-    loves: LOVES[id] ?? 'Warm laps and a sunny window.',
+    loves: LOVES[id] ?? '',
     comfort: COMFORT[id] ?? 'a soft blanket that smells of home',
   };
 }
@@ -170,6 +168,6 @@ export function dayOffsets(weights: Weight[], birthDate: string | null): number[
 
 /** Friendly share sheet copy. */
 export function shareMessage(story: Story): string {
-  const who = story.owner.child ? `${story.owner.name} and ${story.owner.child}` : story.owner.name;
+  const who = story.owner.child ? `${story.owner.name} and ${story.owner.child}` : story.owner.name || 'We';
   return `Meet ${story.name}! ${who} put together ${story.pro.poss} story for you — how ${story.pro.subj} grew, ${story.pro.poss} firsts and a few favourite moments.`;
 }

@@ -3,15 +3,14 @@ import { View } from 'react-native';
 
 import { TAB_BAR_SPACE } from '@/components/TabBar';
 import { Avatar, GuidanceCard, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
-import { DEMO, addDays, daysBetween, formatDayMonth, formatLong } from '@/data/dates';
-import type { PhotoKey } from '@/data/photos';
+import { addDays, daysBetween, formatDayMonth, formatLong } from '@/data/dates';
+import type { Photo } from '@/data/photos';
 import { latestWeight, useStore, weightBefore, weighedOn, type Task } from '@/data/store';
 import { colors } from '@/theme/tokens';
 
 import { Hero, MomentsRail, NamePrompt, WeighCard, type WeighTile } from './LitterCards';
 
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'];
-const GROWING_HERO: PhotoKey[] = ['pipOlder', 'mothPlay', 'nap', 'cuddle'];
 
 /**
  * Today tab once the kittens are here.
@@ -31,7 +30,7 @@ export function HomeLitter() {
   const nameKitten = useStore((s) => s.nameKitten);
 
   const growing = phase === 'growing';
-  const birthDate = birth?.date ?? DEMO.birthDate;
+  const birthDate = birth?.date ?? today;
   const days = Math.max(0, daysBetween(birthDate, today));
   const week = Math.floor(days / 7);
   const n = kittens.length;
@@ -71,14 +70,27 @@ export function HomeLitter() {
     }
   };
 
-  const heroPhotos: (PhotoKey | null)[] = growing ? GROWING_HERO : kittens.map((k) => k.photo);
+  const momentPhotos = [...moments].sort((a, b) => b.date.localeCompare(a.date)).flatMap((m) => (m.photo ? [m.photo] : []));
+  const heroPhotos: (Photo | null)[] = growing ? [...new Set([...momentPhotos, ...kittens.flatMap((k) => (k.photo ? [k.photo] : []))])] : kittens.map((k) => k.photo);
   const unnamed = kittens.filter((k) => !k.name);
   const latestMoments = [...moments].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  const motherName = mother?.name || 'Mum';
 
-  const headline = growing ? `${WORDS[week] ?? week} weeks and full of beans` : `${WORDS[n] ?? n} tiny tummies, all growing`;
+  // Growth copy only claims what the scale has shown: compare each kitten's latest weight with the one before.
+  const changes = tiles.filter((t) => t.delta !== null).map((t) => t.delta as number);
+  const gained = changes.filter((d) => d > 0).length;
+  const since = growing ? 'since last week' : 'since the last weigh-in';
+  const growth =
+    changes.length === 0
+      ? null
+      : gained === n
+        ? `Everyone is up ${since}.`
+        : `${gained} of ${n} ${gained === 1 ? 'is' : 'are'} up ${since}.`;
+
+  const headline = growing ? `${WORDS[week] ?? week} ${week === 1 ? 'week' : 'weeks'} and full of beans` : `${WORDS[n] ?? n} tiny ${n === 1 ? 'tummy' : 'tummies'} to fill`;
   const sub = growing
-    ? 'Weaning has started. Everyone is up since last Sunday, and the sofa is no longer safe.'
-    : `Everyone gained a little yesterday. ${mother?.name ?? 'Mum'} is doing the heavy lifting.`;
+    ? `Weaning has started.${growth ? ` ${growth}` : ' A weekly weigh-in shows how they’re growing.'}`
+    : `${growth ?? (days === 0 ? 'Welcome to the world.' : 'A daily weigh-in shows how they’re growing.')} ${motherName} is doing the heavy lifting.`;
   const stageProgress = growing ? Math.min(1, Math.max(0.1, (days - 21) / 42)) : Math.min(1, Math.max(0.08, days / 21));
 
   return (
@@ -92,12 +104,12 @@ export function HomeLitter() {
             Today
           </Text>
         </View>
-        <Pressable onPress={() => router.push('/sheet/mother-checkin')} accessibilityLabel={`Check in on ${mother?.name ?? 'mum'}`}>
+        <Pressable onPress={() => router.push('/sheet/mother-checkin')} accessibilityRole="button" accessibilityLabel={`Check in on ${motherName}`}>
           <Avatar photo={mother?.photo} size={44} shape="squircle" ring={colors.paw} ringWidth={2} />
         </Pressable>
       </View>
 
-      <Hero photoKeys={heroPhotos} pill={growing ? `Growing · week ${week}` : `Newborns · day ${days}`} dot={growing ? colors.sun : colors.paw} />
+      <Hero photoKeys={heroPhotos} pill={growing ? `Growing · week ${week}` : days === 0 ? 'Newborns · born today' : `Newborns · day ${days}`} dot={growing ? colors.sun : colors.paw} />
 
       <View style={{ gap: 10 }}>
         <Text variant="headline" style={{ fontSize: 30, lineHeight: 32 }}>
@@ -138,10 +150,10 @@ export function HomeLitter() {
         </View>
       </View>
 
-      {growing && latestMoments.length > 0 && (
+      {latestMoments.length > 0 && (
         <View>
-          <SectionHeader title="Latest moments" meta="See all" onMetaPress={() => router.push('/journal')} />
-          <MomentsRail moments={latestMoments} kittens={kittens} today={today} />
+          <SectionHeader title="Latest moments" meta="See all" onMetaPress={() => router.push('/story')} />
+          <MomentsRail moments={latestMoments} kittens={kittens} motherName={motherName} today={today} />
         </View>
       )}
 
@@ -153,7 +165,6 @@ export function HomeLitter() {
               ? 'Weaning starts around now. Offer a little wet food in a shallow dish and let them explore it. Mum still does most of the feeding.'
               : 'Newborns mostly sleep and nurse. Weighing at the same time each day makes small changes easy to spot.'
           }
-          onMore={() => {}}
         />
       </View>
     </Screen>

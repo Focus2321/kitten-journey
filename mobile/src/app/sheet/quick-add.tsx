@@ -4,8 +4,9 @@ import { View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Avatar, Icon, IconButton, Pressable, Sheet, Text, haptic, type IconName, type SheetHandle } from '@/components/ui';
-import type { PhotoKey } from '@/data/photos';
+import type { Photo } from '@/data/photos';
 import { displayName, useStore } from '@/data/store';
+import { pickPhoto } from '@/features/photos/pickPhoto';
 import { colors, motion, radius } from '@/theme/tokens';
 
 type Subject = 'litter' | 'mother' | string;
@@ -18,13 +19,17 @@ const TILES: { kind: Kind; title: string; sub: string; icon: IconName; bg: strin
   { kind: 'photo', title: 'Photo', sub: 'Into their album', icon: 'camera', bg: colors.surface },
 ];
 
-/** A bundled "today" photo per subject for the Photo tile. */
-const PHOTO_FOR: Record<string, PhotoKey> = { litter: 'nap', mother: 'juniperResting', pip: 'pipOlder', fig: 'fig', biscuit: 'biscuit', moth: 'mothPlay' };
+const FEEDS = [
+  { label: 'Nursing', text: 'Nursed and settled.' },
+  { label: 'Bottle', text: 'Had a bottle.' },
+  { label: 'Bowl', text: 'Ate from the bowl.' },
+] as const;
 
 /**
  * Screen 13 — "What happened?" quick add. Moment and Weight hand off to their own sheets
  * (this sheet closes, then `router.replace` swaps it for the next one so the scrim never stacks
- * and back still lands on the home). Feeding and Photo log straight away with a small confirmation.
+ * and back still lands on the home). Feeding asks how, Photo opens the camera or library; both log
+ * with a small confirmation, and cancelling logs nothing.
  */
 export default function QuickAdd() {
   const sheetRef = useRef<SheetHandle>(null);
@@ -32,13 +37,13 @@ export default function QuickAdd() {
   const mother = useStore((s) => s.mother);
   const addMoment = useStore((s) => s.addMoment);
   const tasks = useStore((s) => s.tasks);
-  const toggleTask = useStore((s) => s.toggleTask);
+  const completeTask = useStore((s) => s.completeTask);
 
   const [subject, setSubject] = useState<Subject>('litter');
   const [logged, setLogged] = useState<{ title: string; sub: string } | null>(null);
+  const [feeding, setFeeding] = useState(false);
 
   const subjectName = subject === 'litter' ? 'the litter' : subject === 'mother' ? (mother?.name ?? 'Mum') : displayName(kittens.find((k) => k.id === subject) ?? { name: null, tempId: '' });
-  const subjectPhoto = subject === 'litter' ? null : subject === 'mother' ? (mother?.photo ?? null) : (kittens.find((k) => k.id === subject)?.photo ?? null);
 
   const closeThen = (href: string) => sheetRef.current?.close(() => router.replace(href));
 
@@ -55,15 +60,23 @@ export default function QuickAdd() {
       case 'weight':
         return closeThen(subject === 'litter' || subject === 'mother' ? '/sheet/weigh-in' : `/sheet/weigh-in?kitten=${subject}`);
       case 'feeding':
-        addMoment({ subjectId: subject, kind: 'feeding', text: subject === 'mother' ? `${subjectName} ate well.` : 'Fed and sleepy.', photo: null, first: null });
-        return confirm('Feeding logged', `For ${subjectName} · just now`);
-      case 'photo': {
-        const photo = PHOTO_FOR[subject] ?? subjectPhoto ?? 'nap';
-        addMoment({ subjectId: subject, kind: 'photo', text: 'A photo of today.', photo, first: null });
-        tasks.filter((t) => t.action === 'photo' && !t.done).forEach((t) => toggleTask(t.id));
-        return confirm('Added to the album', `${subjectName} · today`);
-      }
+        return setFeeding(true);
+      case 'photo':
+        return addPhoto();
     }
+  };
+
+  const logFeeding = (feed: (typeof FEEDS)[number]) => {
+    addMoment({ subjectId: subject, kind: 'feeding', text: feed.text, photo: null, first: null });
+    confirm(`${feed.label} logged`, `For ${subjectName} · just now`);
+  };
+
+  const addPhoto = async () => {
+    const photo = await pickPhoto({ title: `Photo of ${subjectName}` });
+    if (!photo || photo === 'remove') return;
+    addMoment({ subjectId: subject, kind: 'photo', text: 'A photo of today.', photo, first: null });
+    tasks.filter((t) => t.action === 'photo' && !t.done).forEach((t) => completeTask(t.id));
+    confirm('Added to the album', `${subjectName} · today`);
   };
 
   return (
@@ -87,6 +100,30 @@ export default function QuickAdd() {
           <Text variant="small" color={colors.muted}>
             {logged.sub}
           </Text>
+        </Animated.View>
+      ) : feeding ? (
+        <Animated.View entering={FadeIn.duration(160)} style={{ gap: 12 }}>
+          <Text variant="label">{`How did ${subjectName} eat?`}</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {FEEDS.map((f) => (
+              <Pressable
+                key={f.label}
+                onPress={() => logFeeding(f)}
+                haptics="selection"
+                accessibilityRole="button"
+                accessibilityLabel={`${f.label} feeding for ${subjectName}`}
+                style={{ flex: 1, height: 52, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+                <Text variant="body" weight={600} style={{ fontSize: 15 }}>
+                  {f.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={() => setFeeding(false)} haptics="none" hitSlop={10} accessibilityRole="button" style={{ alignSelf: 'center', paddingVertical: 6 }}>
+            <Text variant="small" weight={600} color={colors.muted}>
+              Back
+            </Text>
+          </Pressable>
         </Animated.View>
       ) : (
         <>
@@ -119,10 +156,10 @@ export default function QuickAdd() {
   );
 }
 
-function SubjectAvatar({ label, photo, dot, selected, onPress }: { label: string; photo?: PhotoKey | null; dot?: string; selected: boolean; onPress: () => void }) {
+function SubjectAvatar({ label, photo, dot, selected, onPress }: { label: string; photo?: Photo | null; dot?: string; selected: boolean; onPress: () => void }) {
   const isAll = photo === undefined;
   return (
-    <Pressable onPress={onPress} haptics="selection" accessibilityRole="button" accessibilityState={{ selected }} style={{ alignItems: 'center', gap: 6, width: 58 }}>
+    <Pressable onPress={onPress} haptics="selection" accessibilityRole="button" accessibilityLabel={isAll ? 'For the whole litter' : `For ${label}`} accessibilityState={{ selected }} style={{ alignItems: 'center', gap: 6, width: 58 }}>
       <View style={{ width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: selected ? colors.ink : 'transparent' }}>
         {isAll ? (
           <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
@@ -152,7 +189,7 @@ function Tile({ title, sub, icon, bg, index, onPress }: { title: string; sub: st
   const style = useAnimatedStyle(() => ({ opacity: v.value, transform: [{ translateY: 8 * (1 - lift.value) }] }));
   return (
     <Animated.View style={[{ flex: 1 }, style]}>
-      <Pressable onPress={onPress} pressScale={0.97} style={{ height: 124, borderRadius: radius.lg, backgroundColor: bg, padding: 16, justifyContent: 'space-between' }}>
+      <Pressable onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={`${title}: ${sub}`} style={{ height: 124, borderRadius: radius.lg, backgroundColor: bg, padding: 16, justifyContent: 'space-between' }}>
         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={20} />
         </View>

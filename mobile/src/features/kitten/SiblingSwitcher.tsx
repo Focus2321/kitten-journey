@@ -46,7 +46,7 @@ export function SiblingSwitcher({ kittens, activeId, onChange }: Props) {
   const spring = LinearTransition.springify().stiffness(motion.snappy.stiffness).damping(motion.snappy.damping);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4, gap: 4 }}>
+    <View accessibilityRole="tablist" style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4, gap: 4 }}>
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: radius.pill, backgroundColor: colors.ink }, pill]} />
       {kittens.map((k) => {
         const on = k.id === activeId;
@@ -55,7 +55,8 @@ export function SiblingSwitcher({ kittens, activeId, onChange }: Props) {
             <Pressable
               onPress={() => onChange(k.id)}
               haptics="selection"
-              accessibilityRole="tab"
+              // Same as the tab bar: iOS has no per-item "tab" trait, so a selected button reads correctly.
+              accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={displayName(k)}
               pressScale={0.94}

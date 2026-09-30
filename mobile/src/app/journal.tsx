@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar, Icon, IconButton, Pressable, Screen, SectionHeader, Text } from '@/components/ui';
 import { addDays, formatDayMonth, formatRelative, formatShort, toDate } from '@/data/dates';
-import { photos } from '@/data/photos';
+import { photoSource } from '@/data/photos';
 import { useStore, type Checkin } from '@/data/store';
 import { appetiteLabel, duePeriod, PREGNANCY_WEEKS, weekCopy, weekFor } from '@/features/pregnancy/copy';
 import { enter } from '@/features/pregnancy/motion';
@@ -155,7 +155,7 @@ export default function Journal() {
                     gap: 8,
                     transform: [{ rotate: `${TILTS[i % TILTS.length]}deg` }],
                   }}>
-                  <Image source={photos[c.photo!]} contentFit="cover" style={{ width: 104, height: 120, borderRadius: 15 }} />
+                  <Image source={photoSource(c.photo!)} contentFit="cover" style={{ width: 104, height: 120, borderRadius: 15 }} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 4 }}>
                     <Text variant="caption" weight={600} color={colors.ink} style={{ fontSize: 13 }}>
                       {formatShort(c.date)}
@@ -203,7 +203,7 @@ export default function Journal() {
                     ))}
                   </View>
                 )}
-                {c.photo && <Image source={photos[c.photo]} contentFit="cover" style={{ width: 120, height: 120, borderRadius: radius.sm }} />}
+                {c.photo && <Image source={photoSource(c.photo)} contentFit="cover" style={{ width: 120, height: 120, borderRadius: radius.sm }} />}
               </Moment>
             ))}
             <Moment index={newestFirst.length} label={`${formatShort(startISO).toUpperCase()} · THE BEGINNING`} dot="start" last>

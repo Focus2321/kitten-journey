@@ -1,17 +1,17 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Platform, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { Button, Icon, IconButton, IconButtonSpacer, Screen, Text, TopBar } from '@/components/ui';
 import { formatShort } from '@/data/dates';
-import { photos } from '@/data/photos';
+import { photoSource } from '@/data/photos';
 import { colors, radius } from '@/theme/tokens';
 
 import { HomeIcon, TrendIcon } from './HandoffIcons';
 import { NotFound } from './NotFound';
-import { DEFAULT_INCLUDE, encodeInclude, shareLink, shareMessage, useStory, type Include, type IncludeKey } from './story';
+import { DEFAULT_INCLUDE, encodeInclude, shareMessage, useStory, type Include, type IncludeKey } from './story';
 import { Toggle } from './Toggle';
 
 const layout = LinearTransition.duration(260);
@@ -27,10 +27,10 @@ export function ShareStoryScreen({ id }: { id?: string }) {
   const set = (k: IncludeKey) => (v: boolean) => setInclude((i) => ({ ...i, [k]: v }));
 
   const onShare = async () => {
-    const url = shareLink(story.kitten.id);
+    // No public story links yet — share the note on its own rather than a link that goes nowhere.
     const message = shareMessage(story);
     try {
-      await Share.share(Platform.OS === 'ios' ? { message, url } : { message: `${message}\n${url}` }, { subject: `${name}’s story` });
+      await Share.share({ message }, { subject: `${name}’s story` });
     } catch {
       // The user dismissed the sheet — nothing to do.
     }
@@ -38,6 +38,10 @@ export function ShareStoryScreen({ id }: { id?: string }) {
   const onPreview = () => router.push({ pathname: '/shared/[id]', params: { id: story.kitten.id, include: encodeInclude(include) } });
 
   const grewLine = firstWeight && latestWeight && firstWeight.id !== latestWeight.id ? `${firstWeight.grams} g at birth → ${latestWeight.grams} g` : firstWeight ? `${firstWeight.grams} g at birth` : 'No weigh-ins yet';
+  const care = [
+    ['Family vet', mother?.vet ?? ''],
+    ['Loves', loves],
+  ].filter(([, v]) => v) as [string, string][];
   const familyLine = mother || siblings.length ? 'Names and one photo each' : 'Nothing to add yet';
   const privacy = include.family
     ? `Only ${name}’s story, plus ${mother ? `${mother.name} and ` : ''}${pro.poss} siblings by name. Your address stays private.`
@@ -52,13 +56,13 @@ export function ShareStoryScreen({ id }: { id?: string }) {
             Send {name} off with {pro.poss} story
           </Text>
           <Text variant="body" color={colors.muted} style={{ fontSize: 15, lineHeight: 21 }}>
-            Pick what travels with {pro.obj}. One link, nothing to install.
+            Pick what travels with {pro.obj}.
           </Text>
         </View>
         <View style={{ width: 92, height: 116 }}>
           <View style={{ position: 'absolute', left: 14, top: 4, width: 76, height: 96, borderRadius: 18, backgroundColor: colors.pawSoft, transform: [{ rotate: '8deg' }] }} />
           {story.kitten.photo ? (
-            <Image source={photos[story.kitten.photo]} contentFit="cover" style={{ position: 'absolute', left: 0, top: 10, width: 78, height: 100, borderRadius: 18, borderWidth: 3, borderColor: colors.ground, transform: [{ rotate: '-5deg' }] }} />
+            <Image source={photoSource(story.kitten.photo)} contentFit="cover" style={{ position: 'absolute', left: 0, top: 10, width: 78, height: 100, borderRadius: 18, borderWidth: 3, borderColor: colors.ground, transform: [{ rotate: '-5deg' }] }} />
           ) : (
             <View style={{ position: 'absolute', left: 0, top: 10, width: 78, height: 100, borderRadius: 18, borderWidth: 3, borderColor: colors.ground, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-5deg' }] }}>
               <Icon name="cat" size={28} color={colors.muted} />
@@ -83,11 +87,11 @@ export function ShareStoryScreen({ id }: { id?: string }) {
       {/* What travels */}
       <Section label={`What travels with ${pro.obj}`}>
         <Animated.View layout={layout} style={{ borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.lg, padding: 14, gap: 14 }}>
-          <Row tile={colors.pawSoft} icon={<Icon name="image" />} title="Favourite photos" subtitle={photoKeys.length ? `${plural(photoKeys.length, 'photo')} · we picked the best` : 'None yet — add some anytime'} value={include.photos} onChange={set('photos')} />
+          <Row tile={colors.pawSoft} icon={<Icon name="image" />} title="Favourite photos" subtitle={photoKeys.length ? `${plural(photoKeys.length, 'photo')} from ${pro.poss} story` : 'None yet — add some anytime'} value={include.photos} onChange={set('photos')} />
           {include.photos && photoKeys.length > 0 && (
             <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={{ flexDirection: 'row', gap: 6 }}>
               {photoKeys.slice(0, 3).map((p) => (
-                <Image key={p} source={photos[p]} contentFit="cover" style={{ flex: 1, height: 64, borderRadius: 14 }} />
+                <Image key={p} source={photoSource(p)} contentFit="cover" style={{ flex: 1, height: 64, borderRadius: 14 }} />
               ))}
               {photoKeys.length > 3 && (
                 <View style={{ flex: 1, height: 64, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
@@ -106,25 +110,23 @@ export function ShareStoryScreen({ id }: { id?: string }) {
       </Section>
 
       {/* Care essentials */}
-      <Section
-        label="Care essentials"
-        trailing={
-          <Text variant="caption" weight={600} color={colors.ink}>
-            Always included
-          </Text>
-        }>
-        <View style={{ backgroundColor: colors.sunSoft, borderRadius: radius.lg, padding: 16, gap: 12 }}>
-          <CareRow k="Eats" v="Wet kitten food, four small meals a day" />
-          <Divider />
-          <CareRow k="Vet" v="Health check at week 8, first vaccines at week 9" />
-          <Divider />
-          <CareRow k="Next up" v="Second vaccines around week 12. Ask your vet." />
-          <Divider />
-          <CareRow k="Loves" v={loves} />
-        </View>
-        <Text variant="caption" weight={500} style={{ lineHeight: 16 }}>
-          Illustrative only. Your vet’s record is the one that counts.
-        </Text>
+      <Section label="Care essentials">
+        {care.length > 0 ? (
+          <View style={{ backgroundColor: colors.sunSoft, borderRadius: radius.lg, padding: 16, gap: 12 }}>
+            {care.map(([k, v], i) => (
+              <View key={k} style={{ gap: 12 }}>
+                {i > 0 && <Divider />}
+                <CareRow k={k} v={v} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.dashed, borderRadius: radius.lg, padding: 16 }}>
+            <Text variant="small" weight={500} color={colors.muted} style={{ lineHeight: 19 }}>
+              No care notes yet. Food, vet visits and favourite things only appear here once you’ve written them down.
+            </Text>
+          </View>
+        )}
       </Section>
 
       {/* Privacy + CTAs */}
@@ -137,8 +139,11 @@ export function ShareStoryScreen({ id }: { id?: string }) {
             </Text>
           </Animated.View>
         </Animated.View>
-        <Button label={`Create ${name}’s link`} iconLeft="link" onPress={onShare} haptics="medium" />
-        <Button label="Preview what they’ll see" variant="ghost" size="md" onPress={onPreview} haptics="none" />
+        <Button label={`Share a note about ${name}`} iconLeft="share" onPress={onShare} haptics="medium" />
+        <Button label="Preview their story page" variant="ghost" size="md" onPress={onPreview} haptics="none" />
+        <Text variant="caption" weight={500} color={colors.muted} style={{ textAlign: 'center', lineHeight: 16 }}>
+          Story links aren’t live yet, so the full page stays on this phone for now.
+        </Text>
       </Animated.View>
     </Screen>
   );

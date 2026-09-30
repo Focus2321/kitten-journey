@@ -6,7 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Avatar, AvatarStack, Button, Icon, IconButton, Screen, Text, type IconName } from '@/components/ui';
 import { daysBetween, formatDayMonth, formatShort } from '@/data/dates';
-import { photos } from '@/data/photos';
+import { photoSource } from '@/data/photos';
 import { displayName, type Moment } from '@/data/store';
 import { colors, gutter, radius } from '@/theme/tokens';
 
@@ -48,7 +48,7 @@ export function SharedStoryScreen({ id, include }: { id?: string; include: Inclu
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Text variant="caption" style={{ fontSize: 13 }}>
-            Shared by {owner.name}
+            Shared by {owner.name || `${name}’s family`}
           </Text>
           <IconButton icon="close" label="Close" size={36} onPress={close} />
         </View>
@@ -58,7 +58,7 @@ export function SharedStoryScreen({ id, include }: { id?: string; include: Inclu
       <Animated.View entering={enter()} style={{ paddingHorizontal: 12 }}>
         <View style={{ height: 430, borderRadius: 36, overflow: 'hidden', backgroundColor: colors.surface }}>
           {story.kitten.photo ? (
-            <Image source={photos[story.kitten.photo]} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={{ width: '100%', height: '100%' }} />
+            <Image source={photoSource(story.kitten.photo)} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="cat" size={64} color={colors.dashed} />
@@ -84,11 +84,11 @@ export function SharedStoryScreen({ id, include }: { id?: string; include: Inclu
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.pawSoft, alignItems: 'center', justifyContent: 'center' }}>
             <Text variant="small" weight={800} style={{ fontSize: 13, lineHeight: 16 }}>
-              {owner.name.slice(0, 1).toUpperCase()}
+              {(authors[0] ?? name).slice(0, 1).toUpperCase()}
             </Text>
           </View>
           <Text variant="small" weight={600} color={colors.muted}>
-            {joinNames(authors)}
+            {authors.length ? joinNames(authors) : `From ${name}’s first home`}
           </Text>
         </View>
       </Animated.View>
@@ -138,7 +138,7 @@ export function SharedStoryScreen({ id, include }: { id?: string; include: Inclu
             {moments.slice(0, 3).map((m) => (
               <View key={m.id} style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 {m.photo ? (
-                  <Image source={photos[m.photo]} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 14 }} />
+                  <Image source={photoSource(m.photo)} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 14 }} />
                 ) : (
                   <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name="sparkle" size={20} />
@@ -163,8 +163,8 @@ export function SharedStoryScreen({ id, include }: { id?: string; include: Inclu
         <Heading>{pro.Poss} first week with you</Heading>
         <View style={{ borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.lg, paddingVertical: 4, paddingHorizontal: 16 }}>
           <Tip n={1} title="Start with one quiet room" body={`Litter, water and ${comfort} close by. Let ${pro.obj} come to you.`} divider />
-          <Tip n={2} title={`Keep ${pro.poss} food the same`} body="Wet kitten food, four small meals. Change slowly, if at all." divider />
-          <Tip n={3} title={`Book ${pro.poss} second vaccines`} body="Due around week 12. Bring this page to your vet." />
+          <Tip n={2} title={`Keep ${pro.poss} food the same`} body={`Ask what ${pro.subj} ${pro.subj === 'they' ? 'eat' : 'eats'} now and change slowly, if at all.`} divider />
+          <Tip n={3} title="Ask your vet about vaccines" body="Kittens usually need a course of vaccines. Bring this page along." />
         </View>
       </Animated.View>
 
@@ -247,7 +247,7 @@ function FirstCard({ moment, index, birthDate }: { moment: Moment; index: number
   return (
     <View style={{ width: 150, gap: 8 }}>
       {kind === 'photo' && moment.photo ? (
-        <Image source={photos[moment.photo]} contentFit="cover" style={{ height: 170, borderRadius: 22 }} />
+        <Image source={photoSource(moment.photo)} contentFit="cover" style={{ height: 170, borderRadius: 22 }} />
       ) : (
         <View style={{ height: 170, borderRadius: 22, backgroundColor: kind === 'sun' ? colors.sunSoft : colors.pawSoft, alignItems: 'center', justifyContent: 'center' }}>
           {icon && kind === 'sun' ? <Icon name={icon} size={56} strokeWidth={1.6} /> : <PawMark />}

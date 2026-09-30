@@ -90,6 +90,8 @@ export default function Demo() {
                 <Pressable
                   key={p.phase}
                   haptics="selection"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
                   onPress={() => {
                     s().loadDemo(p.phase);
                     router.dismissTo('/');
@@ -110,6 +112,7 @@ export default function Demo() {
             <Pressable
               key={e.n + e.title}
               pressScale={0.98}
+              accessibilityRole="button"
               onPress={() => open(e)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: 14, paddingHorizontal: 16 }}>
               <Text variant="smallStrong" color={colors.muted} style={{ width: 30 }}>

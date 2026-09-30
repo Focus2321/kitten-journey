@@ -6,7 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { TAB_BAR_SPACE } from '@/components/TabBar';
 import { Avatar, AvatarStack, Icon, Pressable, Screen, Text } from '@/components/ui';
 import { ageLabel, daysBetween, formatLong, formatTime, pregnancyWeek, toDate } from '@/data/dates';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { displayName, useStore, type Checkin, type Kitten, type Moment } from '@/data/store';
 import { colors, gutter, radius } from '@/theme/tokens';
 
@@ -57,7 +57,13 @@ export function StoryTab() {
           </Text>
         </View>
         <View style={{ height: 300, borderRadius: radius.xxl, overflow: 'hidden', backgroundColor: colors.surface }}>
-          {mother?.photo && <Image source={photos[born ? 'juniperResting' : mother.photo]} contentFit="cover" style={{ width: '100%', height: '100%' }} />}
+          {mother?.photo ? (
+            <Image source={photoSource(mother.photo)} contentFit="cover" style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="cat" size={56} color={colors.dashed} strokeWidth={1.5} />
+            </View>
+          )}
           {born && (
             <View style={{ position: 'absolute', left: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.ground, borderRadius: radius.pill, paddingVertical: 5, paddingLeft: 5, paddingRight: 16 }}>
               <AvatarStack items={kittens.map((k) => k.photo)} size={36} overlap={12} />
@@ -69,7 +75,7 @@ export function StoryTab() {
 
       {/* 1 · Waiting */}
       {(pregnancy.length > 0 || phase === 'expecting') && (
-        <Chapter n={next()} label={born ? `Waiting · ${month(startISO)} – ${month(birthDate)}` : `Waiting · since ${month(startISO)}`} title={pregnancy.length ? 'She took over the laundry basket' : 'The waiting weeks'}>
+        <Chapter n={next()} label={born ? `Waiting · ${month(startISO)} – ${month(birthDate)}` : `Waiting · since ${month(startISO)}`} title="The waiting weeks">
           {pregnancy.some((c) => c.photo) && (
             <View style={{ flexDirection: 'row', gap: 6, height: 150 }}>
               {pregnancy
@@ -77,7 +83,7 @@ export function StoryTab() {
                 .slice(-3)
                 .map((c) => (
                   <View key={c.id} style={{ flex: 1, borderRadius: radius.md, overflow: 'hidden' }}>
-                    <Image source={photos[c.photo as PhotoKey]} contentFit="cover" style={{ width: '100%', height: '100%' }} />
+                    <Image source={photoSource(c.photo as Photo)} contentFit="cover" style={{ width: '100%', height: '100%' }} />
                     <View style={{ position: 'absolute', left: 8, bottom: 8, backgroundColor: colors.ground, borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: 8 }}>
                       <Text variant="caption" weight={700} color={colors.ink} style={{ fontSize: 11, lineHeight: 14 }}>
                         {mother?.matingDate ? `Wk ${pregnancyWeek(mother.matingDate, c.date)}` : formatLong(c.date).slice(0, 6)}
@@ -139,7 +145,7 @@ export function StoryTab() {
             <Chapter key={m.id} n={next()} label={`${ageLabel(birthDate, m.date)} · ${formatLong(m.date)}`}>
               <View style={{ backgroundColor: colors.pawSoft, borderRadius: radius.xxl, overflow: 'hidden' }}>
                 <View style={{ height: 250, backgroundColor: colors.line }}>
-                  {(m.photo ?? k.photo) && <Image source={photos[(m.photo ?? k.photo) as PhotoKey]} contentFit="cover" style={{ width: '100%', height: '100%' }} />}
+                  {(m.photo ?? k.photo) && <Image source={photoSource((m.photo ?? k.photo) as Photo)} contentFit="cover" style={{ width: '100%', height: '100%' }} />}
                 </View>
                 <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 22, gap: 12 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -163,10 +169,10 @@ export function StoryTab() {
 
       {/* 4 · Firsts and moments */}
       {born && timeline.length > 0 && (
-        <Chapter n={next()} label={weeksLabel(birthDate, today)} title={timeline.some((m) => m.first) ? 'Eyes, then legs, then chaos' : 'Small days, big changes'}>
+        <Chapter n={next()} label={weeksLabel(birthDate, today)} title={timeline.some((m) => m.first) ? 'Firsts, one by one' : 'Small days, big changes'}>
           <View style={{ paddingLeft: 4 }}>
             {timeline.map((m, i) => (
-              <TimelineRow key={m.id} moment={m} kittens={kittens} birthDate={birthDate} index={i} last={i === timeline.length - 1} />
+              <TimelineRow key={m.id} moment={m} kittens={kittens} motherName={motherName} birthDate={birthDate} index={i} last={i === timeline.length - 1} />
             ))}
           </View>
         </Chapter>
@@ -179,7 +185,13 @@ export function StoryTab() {
             {kittens.map((k) => (
               <Pressable key={k.id} onPress={() => router.push(`/kitten/${k.id}`)} pressScale={0.98} accessibilityRole="button" accessibilityLabel={displayName(k)} style={{ width: (width - gutter * 2 - 10) / 2, gap: 8 }}>
                 <View style={{ height: 190, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surface }}>
-                  {k.photo && <Image source={photos[k.photo]} contentFit="cover" style={{ width: '100%', height: '100%' }} />}
+                  {k.photo ? (
+                    <Image source={photoSource(k.photo)} contentFit="cover" style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="paw" size={28} color={colors.dashed} />
+                    </View>
+                  )}
                 </View>
                 <View style={{ paddingHorizontal: 4, gap: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -249,10 +261,10 @@ const DOTS = [
   { fill: colors.ink, ring: colors.line },
 ] as const;
 
-function TimelineRow({ moment, kittens, birthDate, index, last }: { moment: Moment; kittens: Kitten[]; birthDate: string; index: number; last: boolean }) {
+function TimelineRow({ moment, kittens, motherName, birthDate, index, last }: { moment: Moment; kittens: Kitten[]; motherName: string; birthDate: string; index: number; last: boolean }) {
   const dot = DOTS[index % DOTS.length];
   const k = kittens.find((x) => x.id === moment.subjectId);
-  const who = moment.subjectId === 'litter' ? 'All four' : k ? displayName(k) : moment.subjectId === 'mother' ? 'Mum' : null;
+  const who = moment.subjectId === 'litter' ? (kittens.length === 1 ? displayName(kittens[0]) : `All ${word(kittens.length)}`) : k ? displayName(k) : moment.subjectId === 'mother' ? motherName : null;
   const title = moment.first ? `${moment.first}${who ? ` · ${who}` : ''}` : (who ?? 'A moment');
   return (
     <View style={{ flexDirection: 'row', gap: 14 }}>
@@ -274,7 +286,7 @@ function TimelineRow({ moment, kittens, birthDate, index, last }: { moment: Mome
         </View>
         {moment.photo && (
           <View style={{ height: 96, flexDirection: 'row', gap: 6 }}>
-            <Image source={photos[moment.photo]} contentFit="cover" style={{ flex: 1, borderRadius: 16 }} />
+            <Image source={photoSource(moment.photo)} contentFit="cover" style={{ flex: 1, borderRadius: 16 }} />
           </View>
         )}
       </View>

@@ -50,7 +50,7 @@ export function Segmented<T extends string>({ options, value, onChange, tone = '
             onPress={() => onChange(o.value)}
             haptics="selection"
             accessibilityRole="radio"
-            accessibilityState={{ selected: on }}
+            accessibilityState={{ checked: on, selected: on }}
             style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text variant="small" weight={600} color={on && tone === 'ink' ? colors.ground : colors.ink}>
               {o.label}

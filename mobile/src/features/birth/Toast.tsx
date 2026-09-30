@@ -3,12 +3,12 @@ import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Avatar, Icon, Text } from '@/components/ui';
-import type { PhotoKey } from '@/data/photos';
+import type { Photo } from '@/data/photos';
 import { colors, motion, radius } from '@/theme/tokens';
 
 type Props = {
   text: string;
-  photo?: PhotoKey | null;
+  photo?: Photo | null;
   /** How long the toast stays before fading (ms). */
   duration?: number;
 };

@@ -2,11 +2,11 @@ import { Image } from 'expo-image';
 import { View } from 'react-native';
 
 import { Icon, Pressable } from '@/components/ui';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { colors } from '@/theme/tokens';
 
 type Props = {
-  photo: PhotoKey | null;
+  photo: Photo | null;
   size?: number;
   /** Corner radius — the design uses 64 on a 196 squircle. */
   radius?: number;
@@ -23,7 +23,7 @@ export function SquirclePhoto({ photo, size = 196, radius = 64, rotate = -4, onP
     <Pressable onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={photo ? 'Change her photo' : 'Add her photo'} style={{ width: size, height: size }}>
       <View style={{ width: size, height: size, transform: [{ rotate: `${rotate}deg` }] }}>
         {photo ? (
-          <Image source={photos[photo]} contentFit="cover" style={{ width: size, height: size, borderRadius: radius }} />
+          <Image source={photoSource(photo)} contentFit="cover" style={{ width: size, height: size, borderRadius: radius }} />
         ) : (
           <View
             style={{

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 
 import { Text, haptic } from '@/components/ui';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { colors, motion } from '@/theme/tokens';
 
 export type SlotRect = { x: number; y: number; width: number; height: number };
@@ -14,7 +14,7 @@ type Props = {
   count: number;
   active: number;
   /** Photo (or null for a photoless kitten) per filled slot. */
-  filled: (PhotoKey | null | undefined)[];
+  filled: (Photo | null | undefined)[];
 };
 
 export const SLOT = 30;
@@ -51,7 +51,7 @@ export const LitterSlots = forwardRef<LitterSlotsHandle, Props>(function LitterS
   );
 });
 
-function Slot({ index, active, photo, isFilled }: { index: number; active: boolean; photo: PhotoKey | null | undefined; isFilled: boolean }) {
+function Slot({ index, active, photo, isFilled }: { index: number; active: boolean; photo: Photo | null | undefined; isFilled: boolean }) {
   const scale = useSharedValue(1);
   const wasFilled = useRef(isFilled);
   useEffect(() => {
@@ -67,7 +67,7 @@ function Slot({ index, active, photo, isFilled }: { index: number; active: boole
     return (
       <Animated.View style={[{ width: SLOT, height: SLOT, borderRadius: SLOT / 2, overflow: 'hidden', backgroundColor: colors.surface }, style]}>
         {photo ? (
-          <Image source={photos[photo]} contentFit="cover" style={{ width: SLOT, height: SLOT }} />
+          <Image source={photoSource(photo)} contentFit="cover" style={{ width: SLOT, height: SLOT }} />
         ) : (
           <View style={{ flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
             <Text variant="caption" weight={800} color={colors.sun} style={{ fontSize: 13 }}>

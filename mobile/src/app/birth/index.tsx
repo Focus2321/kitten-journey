@@ -18,6 +18,7 @@ type When = 'today' | 'yesterday' | 'pick';
 /** Screen 08 — "The kittens are here!": when, and how many. Unknowns are fine; defaults are today and 4. */
 export default function BirthStart() {
   const today = useStore((s) => s.today);
+  const mother = useStore((s) => s.mother);
   const startBirth = useStore((s) => s.startBirth);
 
   const [when, setWhen] = useState<When>('today');
@@ -49,7 +50,7 @@ export default function BirthStart() {
       <View style={{ gap: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.paw }} />
-          <Text variant="label">Juniper’s big day</Text>
+          <Text variant="label">{mother?.name ? `${mother.name}’s big day` : 'The big day'}</Text>
         </View>
         <Text variant="display" style={{ fontSize: 44, lineHeight: 44 }}>
           The kittens are here!
@@ -83,11 +84,16 @@ export default function BirthStart() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable
               onPress={() => bump(count - 1)}
+              accessibilityRole="button"
               accessibilityLabel="One fewer"
+              accessibilityState={{ disabled: count <= MIN }}
               style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center', opacity: count <= MIN ? 0.5 : 1 }}>
               <View style={{ width: 18, height: 2.5, borderRadius: 2, backgroundColor: colors.ink }} />
             </Pressable>
             <Animated.Text
+              accessibilityRole="text"
+              accessibilityLabel={`${count} ${count === 1 ? 'kitten' : 'kittens'}`}
+              accessibilityLiveRegion="polite"
               style={[
                 { fontFamily: 'BricolageGrotesque_800ExtraBold', fontSize: 96, lineHeight: 100, letterSpacing: -0.05 * 96, color: colors.ink },
                 numberStyle,
@@ -96,7 +102,9 @@ export default function BirthStart() {
             </Animated.Text>
             <Pressable
               onPress={() => bump(count + 1)}
+              accessibilityRole="button"
               accessibilityLabel="One more"
+              accessibilityState={{ disabled: count >= MAX }}
               style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: count >= MAX ? 0.5 : 1 }}>
               <Icon name="plus" size={22} color={colors.ground} strokeWidth={2.4} />
             </Pressable>

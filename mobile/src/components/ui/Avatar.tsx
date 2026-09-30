@@ -1,13 +1,13 @@
 import { Image } from 'expo-image';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { colors } from '@/theme/tokens';
 
 import { Icon } from './Icon';
 
 type Props = {
-  photo?: PhotoKey | null;
+  photo?: Photo | null;
   size?: number;
   /** Ring colour (e.g. sun for "selected", paw for the mother). */
   ring?: string;
@@ -26,7 +26,7 @@ export function Avatar({ photo, size = 44, ring, ringWidth = 3, shape = 'circle'
     <View style={[{ width: size, height: size }, style]}>
       {photo ? (
         <Image
-          source={photos[photo]}
+          source={photoSource(photo)}
           contentFit="cover"
           style={{ width: size, height: size, borderRadius: r, borderWidth: ring ? ringWidth : 0, borderColor: ring }}
         />
@@ -66,7 +66,7 @@ export function Avatar({ photo, size = 44, ring, ringWidth = 3, shape = 'circle'
 }
 
 /** Overlapping avatar stack (family pill, sibling rows). */
-export function AvatarStack({ items, size = 32, overlap = 10 }: { items: (PhotoKey | null)[]; size?: number; overlap?: number }) {
+export function AvatarStack({ items, size = 32, overlap = 10 }: { items: (Photo | null)[]; size?: number; overlap?: number }) {
   const step = size - overlap;
   return (
     <View style={{ width: step * (items.length - 1) + size, height: size }}>

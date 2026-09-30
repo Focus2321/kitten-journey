@@ -6,12 +6,15 @@ import Animated from 'react-native-reanimated';
 import { TAB_BAR_SPACE } from '@/components/TabBar';
 import { Avatar, Card, GuidanceCard, Icon, PhotoPill, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
 import { formatDayMonth, formatLong } from '@/data/dates';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { useStore, type Appetite, type Task } from '@/data/store';
+import { pickPhoto } from '@/features/photos/pickPhoto';
 import { colors, radius } from '@/theme/tokens';
 
 import { APPETITE_OPTIONS, arrivalSentence, expectingPill, PREGNANCY_WEEKS, weekCopy, weekFor } from './copy';
 import { enter } from './motion';
+
+const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 
 const openCheckin = (appetite?: Appetite) =>
   router.push(appetite ? { pathname: '/sheet/mother-checkin', params: { appetite } } : '/sheet/mother-checkin');
@@ -73,18 +76,29 @@ export function HomeExpecting() {
   const checkins = useStore((s) => s.checkins);
   const tasks = useStore((s) => s.tasks);
   const toggleTask = useStore((s) => s.toggleTask);
+  const completeTask = useStore((s) => s.completeTask);
+  const addCheckin = useStore((s) => s.addCheckin);
 
   const name = mother?.name ?? 'Mum';
   const motherCheckins = checkins.filter((c) => c.subjectId === 'mother').sort((a, b) => b.date.localeCompare(a.date));
   const firstDay = motherCheckins.length === 0;
   const todays = motherCheckins.find((c) => c.date === today) ?? null;
-  const latestPhoto: PhotoKey | null = motherCheckins.find((c) => c.photo)?.photo ?? null;
-  const heroPhoto: PhotoKey | null = latestPhoto ?? mother?.photo ?? null;
+  const latestPhoto: Photo | null = motherCheckins.find((c) => c.photo)?.photo ?? null;
+  const heroPhoto: Photo | null = latestPhoto ?? mother?.photo ?? null;
 
   const week = weekFor(mother, today);
   const copy = weekCopy(week);
   const progress = week === null ? 0.1 : Math.min(1, week / PREGNANCY_WEEKS);
   const doneCount = tasks.filter((t) => t.done).length;
+  const bellyPhotoToday = motherCheckins.find((c) => c.date === today && c.photo)?.photo ?? null;
+
+  /** The task is only done once a real photo is in her journal. */
+  const addBellyPhoto = async (t: Task) => {
+    const photo = await pickPhoto({ title: 'Belly photo' });
+    if (!photo || photo === 'remove') return;
+    addCheckin({ subjectId: 'mother', appetite: null, mood: [], note: null, photo });
+    completeTask(t.id);
+  };
 
   const renderTask = (t: Task, i: number) => {
     if (t.action === 'mother-checkin') {
@@ -100,10 +114,18 @@ export function HomeExpecting() {
     }
     if (t.action === 'photo') {
       const title = firstDay ? 'Take her first belly photo' : week ? `Week ${week} belly photo` : t.title;
-      const subtitle = firstDay ? 'Future you will love this one' : t.done ? 'Added this morning' : t.subtitle;
+      const subtitle = t.done && bellyPhotoToday ? 'Added today' : firstDay ? 'Future you will love this one' : t.subtitle;
       return (
         <Animated.View key={t.id} entering={enter(i)}>
-          <TaskRow title={title} subtitle={subtitle} photo={t.done ? latestPhoto : null} icon="camera" done={t.done} onToggle={() => toggleTask(t.id)} />
+          <TaskRow
+            title={title}
+            subtitle={subtitle}
+            photo={t.done ? bellyPhotoToday : null}
+            icon="camera"
+            done={t.done}
+            onPress={() => (t.done ? router.push('/journal') : addBellyPhoto(t))}
+            onToggle={() => toggleTask(t.id)}
+          />
         </Animated.View>
       );
     }
@@ -142,7 +164,7 @@ export function HomeExpecting() {
         <Pressable onPress={() => router.push('/journal')} pressScale={0.99} haptics="none" accessibilityRole="button" accessibilityLabel="Open her journal">
           <View style={{ height: 212, borderRadius: radius.xl, backgroundColor: colors.surface, overflow: 'hidden' }}>
             {heroPhoto ? (
-              <Image source={photos[heroPhoto]} contentFit="cover" style={{ width: '100%', height: '100%' }} />
+              <Image source={photoSource(heroPhoto)} contentFit="cover" style={{ width: '100%', height: '100%' }} />
             ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="cat" size={56} color={colors.dashed} strokeWidth={1.5} />
@@ -190,13 +212,19 @@ export function HomeExpecting() {
                 accessibilityRole="button"
                 accessibilityLabel="Open her pregnancy journal"
                 style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <Image source={photos[heroPhoto ?? 'juniper']} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 16 }} />
+                {heroPhoto ? (
+                  <Image source={photoSource(heroPhoto)} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 16 }} />
+                ) : (
+                  <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="cat" size={22} color={colors.muted} />
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyStrong" weight={700}>
                     {name}’s pregnancy journal
                   </Text>
                   <Text variant="small" color={colors.muted}>
-                    {motherCheckins.length} {motherCheckins.length === 1 ? 'check-in' : 'check-ins'} · {motherCheckins.filter((c) => c.photo).length} belly photos
+                    {plural(motherCheckins.length, 'check-in')} · {plural(motherCheckins.filter((c) => c.photo).length, 'belly photo')}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={18} color={colors.muted} />
@@ -209,7 +237,7 @@ export function HomeExpecting() {
       {/* Good to know */}
       <Animated.View entering={enter(3)} style={{ paddingTop: 26, gap: 12 }}>
         <SectionHeader title={firstDay || week === null ? 'Good to know' : 'Good to know this week'} />
-        <GuidanceCard text={copy.guidance} onMore={() => router.push('/journal')} />
+        <GuidanceCard text={copy.guidance} />
       </Animated.View>
 
       {/* Birth entry — quiet, but there when she needs it. */}

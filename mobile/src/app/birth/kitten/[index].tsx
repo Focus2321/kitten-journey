@@ -1,19 +1,19 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { Button, Icon, IconButton, Pressable, Screen, Segmented, Text, TopBar, haptic } from '@/components/ui';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { COLLARS, displayName, useStore, type Sex } from '@/data/store';
 import { LitterSlots, SLOT, type LitterSlotsHandle } from '@/features/birth/LitterSlots';
 import { Toast } from '@/features/birth/Toast';
+import { GRAMS_ERROR, parseGrams, parseTime, TIME_ERROR } from '@/features/birth/parse';
+import { pickPhoto } from '@/features/photos/pickPhoto';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 const PHOTO = 300;
-/** Bundled kitten photos: the first four match the demo litter, the rest are "retake" options. */
-const KITTEN_PHOTOS: PhotoKey[] = ['pip', 'fig', 'biscuit', 'moth', 'mothPlay', 'pipOlder'];
 const SEX_OPTIONS = [
   { value: 'boy', label: 'Boy' },
   { value: 'girl', label: 'Girl' },
@@ -36,7 +36,7 @@ export default function BirthKitten() {
   const collar = COLLARS[index % COLLARS.length];
   const isLast = index >= count - 1;
 
-  const [photo, setPhoto] = useState<PhotoKey | null>(existing ? existing.photo : (KITTEN_PHOTOS[index] ?? null));
+  const [photo, setPhoto] = useState<Photo | null>(existing?.photo ?? null);
   const [name, setName] = useState(existing?.name ?? '');
   const [collarMode, setCollarMode] = useState(!!existing && !existing.name);
   const [sex, setSex] = useState<Sex | null>(existing?.sex ?? null);
@@ -45,6 +45,10 @@ export default function BirthKitten() {
   const [grams, setGrams] = useState(existing?.birthWeight ? String(existing.birthWeight) : '');
   const [saving, setSaving] = useState(false);
   const [filledCount, setFilledCount] = useState(Math.min(index, kittens.length));
+  const [checked, setChecked] = useState({ time: false, grams: false });
+
+  const timeRef = useRef<TextInput>(null);
+  const gramsRef = useRef<TextInput>(null);
 
   const slotsRef = useRef<LitterSlotsHandle>(null);
   const photoRef = useRef<View>(null);
@@ -62,35 +66,42 @@ export default function BirthKitten() {
   }));
   const detailsStyle = useAnimatedStyle(() => ({ opacity: detailsOpacity.value }));
 
-  const retake = () => {
-    const i = photo ? KITTEN_PHOTOS.indexOf(photo) : -1;
-    setPhoto(KITTEN_PHOTOS[(i + 1) % KITTEN_PHOTOS.length]);
+  const choosePhoto = async () => {
+    const who = collarMode || !name.trim() ? `${collar.tempId} Collar` : name.trim();
+    const picked = await pickPhoto({ title: `Photo of ${who}`, canRemove: photo !== null });
+    if (picked === 'remove') setPhoto(null);
+    else if (picked) setPhoto(picked);
   };
 
-  const parseTime = (t: string) => {
-    const m = t.trim().match(/^(\d{1,2})[:.](\d{2})$/);
-    if (!m) return null;
-    const h = Math.min(23, Number(m[1]));
-    return `${String(h).padStart(2, '0')}:${m[2]}`;
-  };
+  // Empty is fine (everything is optional); anything typed has to make sense.
+  const parsedTime = parseTime(time);
+  const parsedGrams = parseGrams(grams);
+  const timeError = time.trim() && !parsedTime ? TIME_ERROR : null;
+  const gramsError = grams.trim() && parsedGrams === null ? GRAMS_ERROR : null;
+  const shownError = (checked.time && timeError) || (checked.grams && gramsError) || null;
 
-  const goNext = (toast: string, toastPhoto: PhotoKey | null) => {
+  const goNext = (toast: string, toastPhoto: Photo | null) => {
     if (isLast) router.push('/birth/complete');
     else router.push({ pathname: '/birth/kitten/[index]', params: { index: String(index + 1), toast, toastPhoto: toastPhoto ?? '' } });
   };
 
   const save = async () => {
     if (saving) return;
+    if (timeError || gramsError) {
+      setChecked({ time: true, grams: true });
+      haptic('medium');
+      (gramsError ? gramsRef : timeRef).current?.focus();
+      return;
+    }
     setSaving(true);
     const trimmed = name.trim();
-    const w = parseInt(grams, 10);
     saveKitten(index, {
       name: collarMode || !trimmed ? null : trimmed,
       photo,
       sex: sex ?? 'unknown',
       coat: coat.trim(),
-      birthTime: parseTime(time),
-      birthWeight: Number.isFinite(w) && w > 0 ? w : null,
+      birthTime: parsedTime,
+      birthWeight: parsedGrams,
     });
     const shown = displayName({ name: collarMode || !trimmed ? null : trimmed, tempId: collar.tempId });
     const remaining = count - index - 1;
@@ -134,7 +145,7 @@ export default function BirthKitten() {
             left={<IconButton icon="back" label="Back" onPress={() => router.back()} />}
             center={<LitterSlots ref={slotsRef} count={count} active={index} filled={filled} />}
             right={
-              <Pressable onPress={save} haptics="none" hitSlop={10} accessibilityRole="button" disabled={saving}>
+              <Pressable onPress={save} haptics="none" hitSlop={10} accessibilityRole="button" accessibilityLabel="Later" accessibilityHint="Saves what you have entered and moves on" disabled={saving}>
                 <Text variant="body" weight={600} color={colors.muted} style={{ fontSize: 15 }}>
                   Later
                 </Text>
@@ -154,9 +165,9 @@ export default function BirthKitten() {
         <View style={{ alignItems: 'center', paddingTop: 8 }}>
           <Animated.View ref={photoRef} collapsable={false} entering={FadeInDown.duration(220)} style={[{ width: PHOTO, height: PHOTO }, photoStyle]}>
             {photo ? (
-              <Image source={photos[photo]} contentFit="cover" style={{ width: PHOTO, height: PHOTO, borderRadius: 36 }} />
+              <Image source={photoSource(photo)} contentFit="cover" style={{ width: PHOTO, height: PHOTO, borderRadius: 36 }} />
             ) : (
-              <Pressable onPress={retake} pressScale={0.98} style={{ width: PHOTO, height: PHOTO, borderRadius: 36, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.dashed, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <Pressable onPress={choosePhoto} pressScale={0.98} accessibilityRole="button" accessibilityLabel="Add a photo" style={{ width: PHOTO, height: PHOTO, borderRadius: 36, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.dashed, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="camera" size={24} />
                 </View>
@@ -167,19 +178,21 @@ export default function BirthKitten() {
             )}
             {photo && (
               <Pressable
-                onPress={retake}
+                onPress={choosePhoto}
                 haptics="selection"
+                accessibilityRole="button"
+                accessibilityLabel="Change or remove photo"
                 style={{ position: 'absolute', left: 14, bottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.ground, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 12 }}>
                 <Icon name="camera" size={16} />
                 <Text variant="caption" weight={600} color={colors.ink} style={{ fontSize: 13 }}>
-                  Retake
+                  Change
                 </Text>
               </Pressable>
             )}
           </Animated.View>
           {params.toast ? (
             <View pointerEvents="none" style={{ position: 'absolute', top: 18, left: 0, right: 0, alignItems: 'center' }}>
-              <Toast key={params.toast} text={params.toast} photo={params.toastPhoto ? (params.toastPhoto as PhotoKey) : null} />
+              <Toast key={params.toast} text={params.toast} photo={params.toastPhoto ? (params.toastPhoto as Photo) : null} />
             </View>
           ) : null}
         </View>
@@ -188,7 +201,7 @@ export default function BirthKitten() {
           <View style={{ gap: 6, paddingHorizontal: 4 }}>
             <Text variant="label">{collarMode ? 'Temporary name' : 'Their name'}</Text>
             {collarMode ? (
-              <Pressable onPress={() => setCollarMode(false)} haptics="none" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 2, borderBottomColor: colors.ink, paddingBottom: 8 }}>
+              <Pressable onPress={() => setCollarMode(false)} haptics="none" accessibilityRole="button" accessibilityLabel={`${collar.tempId} Collar, temporary name`} accessibilityHint="Type a real name instead" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 2, borderBottomColor: colors.ink, paddingBottom: 8 }}>
                 <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: collar.color }} />
                 <Text variant="display" style={{ fontSize: 44, lineHeight: 50 }}>
                   {collar.tempId} Collar
@@ -205,6 +218,7 @@ export default function BirthKitten() {
                 autoCapitalize="words"
                 autoCorrect={false}
                 returnKeyType="done"
+                accessibilityLabel="Their name"
                 style={{ fontFamily: fonts[800], fontSize: 44, lineHeight: 50, letterSpacing: -0.035 * 44, color: colors.ink, borderBottomWidth: 2, borderBottomColor: colors.ink, paddingBottom: 8, paddingTop: 0 }}
               />
             )}
@@ -227,7 +241,11 @@ export default function BirthKitten() {
                       haptic('selection');
                     }}
                     haptics="none"
+                    disabled={!mine}
+                    accessibilityRole="button"
                     accessibilityLabel={`${c.tempId} collar`}
+                    accessibilityHint={mine ? 'Use this collar colour as a temporary name' : 'Used by another kitten in the litter'}
+                    accessibilityState={{ selected, disabled: !mine }}
                     style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: selected ? 2.5 : 0, borderColor: colors.ink, opacity: mine ? 1 : 0.35 }}>
                     <View style={{ width: selected ? 24 : 34, height: selected ? 24 : 34, borderRadius: 17, backgroundColor: c.color }} />
                   </Pressable>
@@ -239,12 +257,31 @@ export default function BirthKitten() {
           <Segmented options={SEX_OPTIONS} value={sex} onChange={setSex} tone="ground" />
 
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Field label="Coat" value={coat} onChange={setCoat} placeholder="Grey tabby" flex={1.4} />
-            <Field label="Born at" value={time} onChange={setTime} placeholder="5:42" keyboard="numbers-and-punctuation" />
-            <Field label="Weight" value={grams} onChange={setGrams} placeholder="102 g" keyboard="number-pad" />
+            <Field label="Coat" value={coat} onChange={setCoat} placeholder="Grey tabby" flex={1.4} returnKey="next" onSubmit={() => timeRef.current?.focus()} />
+            <Field
+              label="Born at"
+              inputRef={timeRef}
+              value={time}
+              onChange={setTime}
+              onBlur={() => setChecked((c) => ({ ...c, time: true }))}
+              placeholder="5:42"
+              invalid={checked.time && !!timeError}
+              returnKey="next"
+              onSubmit={() => gramsRef.current?.focus()}
+            />
+            <Field
+              label="Weight"
+              inputRef={gramsRef}
+              value={grams}
+              onChange={setGrams}
+              onBlur={() => setChecked((c) => ({ ...c, grams: true }))}
+              placeholder="102 g"
+              invalid={checked.grams && !!gramsError}
+              returnKey="done"
+            />
           </View>
-          <Text variant="caption" style={{ paddingHorizontal: 4 }}>
-            All optional. Fill in what you know; the rest can wait.
+          <Text variant="caption" color={shownError ? colors.orange : undefined} weight={shownError ? 600 : undefined} accessibilityLiveRegion="polite" style={{ paddingHorizontal: 4 }}>
+            {shownError ?? 'All optional. Fill in what you know; the rest can wait.'}
           </Text>
         </Animated.View>
       </Screen>
@@ -252,20 +289,42 @@ export default function BirthKitten() {
   );
 }
 
-function Field({ label, value, onChange, placeholder, keyboard, flex = 1 }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; keyboard?: 'number-pad' | 'numbers-and-punctuation'; flex?: number }) {
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  onSubmit?: () => void;
+  placeholder: string;
+  returnKey: 'next' | 'done';
+  invalid?: boolean;
+  inputRef?: RefObject<TextInput | null>;
+  flex?: number;
+};
+
+function Field({ label, value, onChange, onBlur, onSubmit, placeholder, returnKey, invalid, inputRef, flex = 1 }: FieldProps) {
+  const numeric = label !== 'Coat';
   return (
-    <View style={{ flex, backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, gap: 1 }}>
-      <Text variant="caption" weight={600} style={{ fontSize: 11, lineHeight: 13 }}>
+    <View style={{ flex, backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, gap: 1, borderWidth: 1.5, borderColor: invalid ? colors.orange : 'transparent' }}>
+      <Text variant="caption" weight={600} color={invalid ? colors.orange : undefined} style={{ fontSize: 11, lineHeight: 13 }}>
         {label}
       </Text>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChange}
+        onBlur={onBlur}
+        onSubmitEditing={onSubmit}
         placeholder={placeholder}
         placeholderTextColor={colors.dashed}
         selectionColor={colors.sun}
-        keyboardType={keyboard}
+        // Numbers-and-punctuation keeps a return key on iOS, so the keyboard can always be closed or advanced.
+        keyboardType={numeric ? 'numbers-and-punctuation' : 'default'}
+        returnKeyType={returnKey}
+        submitBehavior={returnKey === 'next' ? 'submit' : 'blurAndSubmit'}
         autoCorrect={false}
+        accessibilityLabel={label === 'Weight' ? 'Weight in grams' : label}
+        aria-invalid={invalid}
         style={{ fontFamily: fonts[600], fontSize: 15, lineHeight: 20, color: colors.ink, padding: 0 }}
       />
     </View>

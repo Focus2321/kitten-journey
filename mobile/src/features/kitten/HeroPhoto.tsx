@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { colors } from '@/theme/tokens';
 
 const PARALLAX = 12;
@@ -12,7 +12,7 @@ const DURATION = 240;
 const ease = Easing.out(Easing.cubic);
 
 type Props = {
-  photo: PhotoKey | null;
+  photo: Photo | null;
   /** +1 when moving to a sibling on the right, −1 to the left. Drives the parallax direction. */
   direction: 1 | -1;
   height?: number;
@@ -49,7 +49,7 @@ export function HeroPhoto({ photo, direction, height = 340, children }: Props) {
   );
 }
 
-function Layer({ photo }: { photo: PhotoKey | null }) {
+function Layer({ photo }: { photo: Photo | null }) {
   if (!photo) {
     return (
       <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 8 }]}>
@@ -58,5 +58,5 @@ function Layer({ photo }: { photo: PhotoKey | null }) {
     );
   }
   // Slight overscale so the parallax never shows an edge.
-  return <Image source={photos[photo]} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={[StyleSheet.absoluteFill, { marginHorizontal: -PARALLAX }]} />;
+  return <Image source={photoSource(photo)} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={[StyleSheet.absoluteFill, { marginHorizontal: -PARALLAX }]} />;
 }

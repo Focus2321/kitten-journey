@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { TAB_BAR_SPACE } from '@/components/TabBar';
 import { Avatar, Card, Icon, PhotoPill, Pressable, Screen, Text } from '@/components/ui';
 import { ageLabel, ageSentence, formatShort, pregnancyWeek } from '@/data/dates';
-import { photos } from '@/data/photos';
+import { photoSource } from '@/data/photos';
 import { displayName, latestWeight, useStore, type Kitten } from '@/data/store';
 import { colors, radius } from '@/theme/tokens';
 
@@ -92,7 +92,7 @@ function KittenCard({ kitten, weight, home }: { kitten: Kitten; weight: number |
       <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surface }}>
         <View style={{ height: 200, backgroundColor: colors.line }}>
           {kitten.photo ? (
-            <Image source={photos[kitten.photo]} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={{ width: '100%', height: '100%' }} />
+            <Image source={photoSource(kitten.photo)} contentFit="cover" contentPosition={{ top: '35%', left: '50%' }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="camera" size={28} color={colors.muted} />

@@ -35,6 +35,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       pointerEvents="box-none"
       style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View
+        accessibilityRole="tablist"
         style={{
           flex: 1,
           height: 64,
@@ -59,7 +60,8 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             <Pressable
               key={route.key}
               haptics="selection"
-              accessibilityRole="tab"
+              // iOS has no per-item "tab" trait: the tablist container carries the tab-bar trait, items are selectable buttons.
+              accessibilityRole="button"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={tab.label}
               onPress={() => {

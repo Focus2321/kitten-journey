@@ -5,9 +5,9 @@ import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { Avatar, Button, Screen, Text, haptic } from '@/components/ui';
+import { Avatar, Button, Icon, Screen, Text, haptic } from '@/components/ui';
 import { formatLong } from '@/data/dates';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { displayName, useStore } from '@/data/store';
 import { colors, motion, radius } from '@/theme/tokens';
 
@@ -44,8 +44,10 @@ export default function BirthComplete() {
 
   const go = () => {
     finishBirth();
-    router.dismissAll();
-    router.replace('/');
+    // Land on the family itself — the button promises it, and the new kittens live there.
+    // The stack is rooted at the tabs (expecting) or at welcome (kittens already born), so clear it either way.
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/family');
   };
 
   return (
@@ -63,7 +65,13 @@ export default function BirthComplete() {
         <Confetti />
         <Pop delay={0} style={{ position: 'absolute', left: 125, top: 95 }}>
           <View style={{ width: 140, height: 140, borderRadius: 70, borderWidth: 6, borderColor: colors.paw, overflow: 'hidden', backgroundColor: colors.surface }}>
-            {mother?.photo && <Image source={photos[mother.photo]} contentFit="cover" style={{ width: 128, height: 128 }} />}
+            {mother?.photo ? (
+              <Image source={photoSource(mother.photo)} contentFit="cover" style={{ width: 128, height: 128 }} />
+            ) : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="cat" size={48} color={colors.dashed} strokeWidth={1.5} />
+              </View>
+            )}
           </View>
         </Pop>
         {kittens.slice(0, 4).map((k, i) => {
@@ -78,7 +86,7 @@ export default function BirthComplete() {
 
       <View style={{ gap: 12, alignItems: 'center' }}>
         <Text variant="display" align="center" style={{ fontSize: 44, lineHeight: 46 }}>
-          Welcome, little ones
+          {n === 1 ? 'Welcome, little one' : 'Welcome, little ones'}
         </Text>
         <Text variant="body" color={colors.muted} align="center">
           {mother?.name ?? 'Mum'} and her {countWord} {n === 1 ? 'kitten' : 'kittens'} are all together in one place. Born {formatLong(bornOn)}.
@@ -102,7 +110,7 @@ export default function BirthComplete() {
   );
 }
 
-function Polaroid({ photo, size, label }: { photo: PhotoKey | null; size: number; label: string }) {
+function Polaroid({ photo, size, label }: { photo: Photo | null; size: number; label: string }) {
   return (
     <View
       style={{
@@ -122,7 +130,7 @@ function Polaroid({ photo, size, label }: { photo: PhotoKey | null; size: number
         justifyContent: 'center',
       }}>
       {photo ? (
-        <Image source={photos[photo]} contentFit="cover" style={{ width: size, height: size }} />
+        <Image source={photoSource(photo)} contentFit="cover" style={{ width: size, height: size }} />
       ) : (
         <Text variant="small" weight={700} color={colors.muted}>
           {label}

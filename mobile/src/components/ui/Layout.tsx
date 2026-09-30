@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
-import type { ReactNode } from 'react';
-import { ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Platform, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { colors, gutter, radius } from '@/theme/tokens';
 
 import { Icon, type IconName } from './Icon';
@@ -23,21 +24,36 @@ type ScreenProps = ScrollViewProps & {
   contentStyle?: StyleProp<ViewStyle>;
 };
 
-/** White phone screen with safe areas, 20px gutters and an optional pinned footer. */
+/** White phone screen with safe areas, 20px gutters and an optional pinned footer. The footer rides on top of the keyboard and focused inputs scroll clear of both. */
 export function Screen({ children, footer, header, scroll = true, padded = true, bottomInset = 0, contentStyle, ...rest }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const [footerHeight, setFooterHeight] = useState(0);
   const content = [{ paddingHorizontal: padded ? gutter : 0, paddingBottom: 24 + bottomInset }, contentStyle];
+  const footerPad = Math.max(insets.bottom, 16) + 4;
+  // With the keyboard up the home-indicator inset is hidden, so the footer only needs a small gap above the keys.
+  const footerDrop = footer ? footerPad - 12 : 0;
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground, paddingTop: insets.top }}>
       {header}
       {scroll ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={content} {...rest}>
+        <KeyboardAwareScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          bottomOffset={footer ? footerHeight - footerDrop + 16 : 24}
+          extraKeyboardSpace={footer ? -footerDrop : -bottomInset}
+          contentContainerStyle={content}
+          {...rest}>
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         <View style={[{ flex: 1 }, content]}>{children}</View>
       )}
-      {footer && <View style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) + 4, gap: 12 }}>{footer}</View>}
+      {footer && (
+        <KeyboardStickyView offset={{ closed: 0, opened: footerDrop }} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)} style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: footerPad, gap: 12, backgroundColor: colors.ground }}>
+          {footer}
+        </KeyboardStickyView>
+      )}
     </View>
   );
 }
@@ -78,7 +94,7 @@ export function SectionHeader({ title, meta, onMetaPress }: { title: string; met
       <Text variant="section">{title}</Text>
       {meta &&
         (onMetaPress ? (
-          <Pressable onPress={onMetaPress} haptics="none">
+          <Pressable onPress={onMetaPress} haptics="none" accessibilityRole="button">
             <Text variant="small" weight={700}>
               {meta}
             </Text>
@@ -101,7 +117,7 @@ export function GuidanceCard({ eyebrow, text, onMore }: { eyebrow?: string; text
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text variant="caption">General guidance · ask your vet if unsure</Text>
         {onMore && (
-          <Pressable onPress={onMore} haptics="none" hitSlop={10}>
+          <Pressable onPress={onMore} haptics="none" hitSlop={10} accessibilityRole="button" accessibilityLabel="More guidance">
             <Text variant="small" weight={700}>
               More
             </Text>
@@ -115,35 +131,42 @@ export function GuidanceCard({ eyebrow, text, onMore }: { eyebrow?: string; text
 type TaskRowProps = {
   title: string;
   subtitle?: string;
-  photo?: PhotoKey | null;
+  photo?: Photo | null;
   icon?: IconName;
   done?: boolean;
   onPress?: () => void;
   onToggle?: () => void;
 };
 
-/** "For today" row: thumbnail or icon tile, title/subtitle, round check. */
+/** "For today" row: thumbnail or icon tile, title/subtitle, round check. The row and the check are separate controls. */
 export function TaskRow({ title, subtitle, photo, icon, done, onPress, onToggle }: TaskRowProps) {
   return (
-    <Pressable onPress={onPress ?? onToggle} pressScale={0.98} style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-      {photo ? (
-        <Image source={photos[photo]} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 12 }} />
-      ) : (
-        <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={icon ?? 'sparkle'} size={20} />
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text variant="bodyStrong" weight={700}>
-          {title}
-        </Text>
-        {subtitle && (
-          <Text variant="small" color={colors.muted}>
-            {subtitle}
-          </Text>
+    <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <Pressable
+        onPress={onPress ?? onToggle}
+        pressScale={0.98}
+        accessibilityRole="button"
+        accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        {photo ? (
+          <Image source={photoSource(photo)} contentFit="cover" style={{ width: 48, height: 48, borderRadius: 12 }} />
+        ) : (
+          <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={icon ?? 'sparkle'} size={20} />
+          </View>
         )}
-      </View>
-      <Pressable onPress={onToggle} haptics="success" hitSlop={10} accessibilityRole="checkbox" accessibilityState={{ checked: !!done }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyStrong" weight={700}>
+            {title}
+          </Text>
+          {subtitle && (
+            <Text variant="small" color={colors.muted}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
+      </Pressable>
+      <Pressable onPress={onToggle} haptics="success" hitSlop={10} accessibilityRole="checkbox" accessibilityLabel={`${title} done`} accessibilityState={{ checked: !!done }}>
         <View
           style={{
             width: 28,
@@ -158,7 +181,7 @@ export function TaskRow({ title, subtitle, photo, icon, done, onPress, onToggle 
           {done && <Icon name="check" size={16} color={colors.ground} strokeWidth={2.4} />}
         </View>
       </Pressable>
-    </Pressable>
+    </View>
   );
 }
 

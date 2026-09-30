@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Avatar, Button, Icon, IconButton, Pressable, Sheet, Text, haptic, type SheetHandle } from '@/components/ui';
-import { daysBetween } from '@/data/dates';
+import { daysBetween, formatShort } from '@/data/dates';
 import { displayName, useStore, weightBefore, weighedOn, type Kitten } from '@/data/store';
 import { DrawnCheck, RollingNumber, Ruler, type RulerHandle } from '@/features/litter/WeighParts';
 import { colors, radius } from '@/theme/tokens';
@@ -12,6 +12,14 @@ import { colors, radius } from '@/theme/tokens';
 const WORDS = ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 const word = (n: number) => WORDS[n] ?? String(n);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** When the previous weigh-in actually was — "yesterday", "last week" or "on 21 Sep" — never assumed. */
+function whenLabel(date: string, today: string) {
+  const days = daysBetween(date, today);
+  if (days === 1) return 'yesterday';
+  if (days === 7) return 'last week';
+  return `on ${formatShort(date)}`;
+}
 
 /**
  * Screen 14 — weigh-in sheet. One kitten at a time, starting with the first not weighed today
@@ -31,7 +39,6 @@ export default function WeighIn() {
   const toggleTask = useStore((s) => s.toggleTask);
 
   const growing = phase === 'growing';
-  const sinceLabel = growing ? 'last Sunday' : 'yesterday';
   const isDone = (k: Kitten) => !!weighedOn(weights, k.id, today);
 
   const [currentId, setCurrentId] = useState<string | null>(() => {
@@ -48,8 +55,11 @@ export default function WeighIn() {
   const doneCount = kittens.filter(isDone).length;
   const leftCount = kittens.length - doneCount;
 
-  // Starting point: a gram or so above last time, so most days it is a nudge rather than a scroll.
-  const start = prev ? prev.grams + 7 : growing ? 500 : 100;
+  const todays = current ? weighedOn(weights, current.id, today) : null;
+  const sinceLabel = prev ? whenLabel(prev.date, today) : '';
+  // Starting point: today's reading when adjusting one, else a little above last time (a nudge rather
+  // than a scroll), else the birth weight.
+  const start = todays?.grams ?? (prev ? prev.grams + 7 : (current?.birthWeight ?? (growing ? 500 : 100)));
   const min = Math.max(10, start - 120);
   const max = start + 300;
   const rulerRef = useRef<RulerHandle>(null);
@@ -124,7 +134,7 @@ export default function WeighIn() {
       </View>
 
       {summary ? (
-        <Summary kittens={kittens} today={today} sinceLabel={sinceLabel} />
+        <Summary kittens={kittens} today={today} />
       ) : (
         <>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -142,16 +152,16 @@ export default function WeighIn() {
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Pressable onPress={() => rulerRef.current?.scrollTo(grams - 1)} haptics="none" accessibilityLabel="One gram less" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
+                <Pressable onPress={() => rulerRef.current?.scrollTo(grams - 1)} haptics="none" accessibilityRole="button" accessibilityLabel="One gram less" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
                   <View style={{ width: 16, height: 2.5, borderRadius: 2, backgroundColor: colors.ink }} />
                 </Pressable>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                <View accessible accessibilityRole="text" accessibilityLabel={`${grams} grams`} accessibilityLiveRegion="polite" style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                   <RollingNumber value={grams} />
                   <Text variant="title" weight={700} style={{ fontSize: 24, lineHeight: 30 }}>
                     g
                   </Text>
                 </View>
-                <Pressable onPress={() => rulerRef.current?.scrollTo(grams + 1)} haptics="none" accessibilityLabel="One gram more" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+                <Pressable onPress={() => rulerRef.current?.scrollTo(grams + 1)} haptics="none" accessibilityRole="button" accessibilityLabel="One gram more" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="plus" size={20} color={colors.sun} strokeWidth={2.4} />
                 </Pressable>
               </View>
@@ -182,7 +192,7 @@ function KittenPill({ kitten, state, onPress }: { kitten: Kitten; state: 'done' 
   const name = displayName(kitten);
   if (state === 'current') {
     return (
-      <Pressable onPress={onPress} haptics="none" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 56, borderRadius: radius.pill, backgroundColor: colors.ink, padding: 4, paddingRight: 14, flexShrink: 1 }}>
+      <Pressable onPress={onPress} haptics="none" accessibilityRole="button" accessibilityLabel={`${name}, weighing now`} accessibilityState={{ selected: true }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 56, borderRadius: radius.pill, backgroundColor: colors.ink, padding: 4, paddingRight: 14, flexShrink: 1 }}>
         <Avatar photo={kitten.photo} size={48} ring={colors.sun} ringWidth={2} dot={kitten.name ? undefined : kitten.tempColor} />
         <Text variant="small" weight={700} color={colors.ground} numberOfLines={1}>
           {name}
@@ -192,14 +202,14 @@ function KittenPill({ kitten, state, onPress }: { kitten: Kitten; state: 'done' 
   }
   if (state === 'done') {
     return (
-      <Pressable onPress={onPress} haptics="selection" accessibilityLabel={`${name}, weighed`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 56, borderRadius: radius.pill, backgroundColor: colors.surface, padding: 4, paddingRight: 8 }}>
+      <Pressable onPress={onPress} haptics="selection" accessibilityRole="button" accessibilityLabel={`${name}, weighed`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 56, borderRadius: radius.pill, backgroundColor: colors.surface, padding: 4, paddingRight: 8 }}>
         <Avatar photo={kitten.photo} size={48} style={{ opacity: 0.55 }} />
         <Icon name="check" size={16} strokeWidth={2.6} />
       </Pressable>
     );
   }
   return (
-    <Pressable onPress={onPress} haptics="selection" accessibilityLabel={`${name}, to weigh`} style={{ height: 56, width: 56, borderRadius: 28, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.dashed, alignItems: 'center', justifyContent: 'center' }}>
+    <Pressable onPress={onPress} haptics="selection" accessibilityRole="button" accessibilityLabel={`${name}, to weigh`} style={{ height: 56, width: 56, borderRadius: 28, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.dashed, alignItems: 'center', justifyContent: 'center' }}>
       <Avatar photo={kitten.photo} size={46} dot={kitten.name ? undefined : kitten.tempColor} />
     </Pressable>
   );
@@ -220,15 +230,27 @@ function DeltaPill({ delta, sinceLabel }: { delta: number | null; sinceLabel: st
 }
 
 /** "All four weighed" — rows settle in 40 ms apart. */
-function Summary({ kittens, today, sinceLabel }: { kittens: Kitten[]; today: string; sinceLabel: string }) {
+function Summary({ kittens, today }: { kittens: Kitten[]; today: string }) {
   const weights = useStore((s) => s.weights);
   const rows = kittens.map((k) => {
     const now = weighedOn(weights, k.id, today);
     const before = weightBefore(weights, k.id, today);
     const delta = now && before ? now.grams - before.grams : null;
-    return { kitten: k, grams: now?.grams ?? null, delta, since: before ? daysBetween(before.date, today) : null };
+    return { kitten: k, grams: now?.grams ?? null, delta, since: before?.date ?? null };
   });
-  const allUp = rows.every((r) => r.delta !== null && r.delta > 0);
+  // Only claim what the scale showed: no comparison without an earlier weight, and a dip is named as one.
+  const compared = rows.filter((r) => r.delta !== null);
+  const anyDown = compared.some((r) => (r.delta as number) < 0);
+  const allUp = compared.length === rows.length && compared.every((r) => (r.delta as number) > 0);
+  const sinceDates = [...new Set(compared.map((r) => r.since))];
+  const since = sinceDates.length === 1 && sinceDates[0] ? ` since ${whenLabel(sinceDates[0], today).replace(/^on /, '')}` : '';
+  const line = allUp
+    ? `Everyone’s up${since}. Nice work.`
+    : anyDown
+      ? 'All logged. Small dips happen — keep an eye on the next weigh-in.'
+      : compared.length === 0
+        ? 'All logged. The next weigh-in will show how they’re growing.'
+        : 'All logged.';
   return (
     <View style={{ gap: 8 }}>
       {rows.map((r, i) => (
@@ -255,7 +277,7 @@ function Summary({ kittens, today, sinceLabel }: { kittens: Kitten[]; today: str
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6 }}>
           <DrawnCheck size={20} color={colors.green} delay={rows.length * 40 + 80} />
           <Text variant="small" color={colors.muted}>
-            {allUp ? `Everyone’s up since ${sinceLabel}. Nice work.` : 'All logged. Small dips happen — keep an eye on tomorrow.'}
+            {line}
           </Text>
         </View>
       </Settle>

@@ -5,7 +5,7 @@ import { ScrollView, TextInput, View } from 'react-native';
 
 import { Avatar, Button, Icon, PhotoPill, Pressable, Text } from '@/components/ui';
 import { formatRelative } from '@/data/dates';
-import { photos, type PhotoKey } from '@/data/photos';
+import { photoSource, type Photo } from '@/data/photos';
 import { displayName, type Kitten, type Moment } from '@/data/store';
 import { colors, fonts, radius } from '@/theme/tokens';
 
@@ -13,11 +13,11 @@ import { colors, fonts, radius } from '@/theme/tokens';
 // Hero — four photos in a rounded 2×2 block with the stage pill on top.
 // ---------------------------------------------------------------------------
 
-export function Hero({ photoKeys, pill, dot }: { photoKeys: (PhotoKey | null)[]; pill: string; dot?: string }) {
+export function Hero({ photoKeys, pill, dot }: { photoKeys: (Photo | null)[]; pill: string; dot?: string }) {
   const four = [0, 1, 2, 3].map((i) => photoKeys[i] ?? null);
-  const cell = (key: PhotoKey | null, i: number) =>
+  const cell = (key: Photo | null, i: number) =>
     key ? (
-      <Image key={i} source={photos[key]} contentFit="cover" style={{ flex: 1 }} />
+      <Image key={i} source={photoSource(key)} contentFit="cover" style={{ flex: 1 }} />
     ) : (
       <View key={i} style={{ flex: 1, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="paw" size={22} color={colors.dashed} />
@@ -56,8 +56,15 @@ export function WeighCard({ title, subtitle, tiles, onWeigh }: WeighCardProps) {
   const done = tiles.filter((t) => t.grams !== null).length;
   const allDone = done === tiles.length && tiles.length > 0;
   return (
-    <Pressable onPress={() => onWeigh()} pressScale={0.985} haptics="none" style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, gap: 14 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+    <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, gap: 14 }}>
+      {/* The header and each kitten are separate controls so screen readers reach every Weigh action. */}
+      <Pressable
+        onPress={() => onWeigh()}
+        pressScale={0.985}
+        haptics="none"
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${done} of ${tiles.length} weighed. ${subtitle}`}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="bodyStrong" weight={700}>
             {title}
@@ -72,13 +79,13 @@ export function WeighCard({ title, subtitle, tiles, onWeigh }: WeighCardProps) {
             {done} / {tiles.length}
           </Text>
         </View>
-      </View>
+      </Pressable>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {tiles.map((t) => (
           <KittenTile key={t.kitten.id} tile={t} onPress={() => (t.grams === null ? onWeigh(t.kitten.id) : router.push(`/kitten/${t.kitten.id}`))} />
         ))}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -90,6 +97,9 @@ function KittenTile({ tile, onPress }: { tile: WeighTile; onPress: () => void })
     <Pressable
       onPress={onPress}
       haptics="selection"
+      accessibilityRole="button"
+      accessibilityLabel={done ? `${displayName(kitten)}, ${grams} grams${delta !== null && delta > 0 ? `, up ${delta}` : ''}` : `Weigh ${displayName(kitten)}`}
+      accessibilityHint={done ? 'Opens their profile' : undefined}
       style={{
         flex: 1,
         alignItems: 'center',
@@ -150,7 +160,7 @@ export function NamePrompt({ kitten, onName }: { kitten: Kitten; onName: (name: 
           </Text>
         </View>
         {!open && (
-          <Pressable onPress={() => setOpen(true)} haptics="selection" style={{ backgroundColor: colors.ground, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 }}>
+          <Pressable onPress={() => setOpen(true)} haptics="selection" accessibilityRole="button" accessibilityLabel={`Name ${kitten.tempId} Collar`} style={{ backgroundColor: colors.ground, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 }}>
             <Text variant="small" weight={700}>
               Name
             </Text>
@@ -163,6 +173,7 @@ export function NamePrompt({ kitten, onName }: { kitten: Kitten; onName: (name: 
             value={value}
             onChangeText={setValue}
             placeholder="Biscuit?"
+            accessibilityLabel={`Name for ${kitten.tempId} Collar`}
             placeholderTextColor={colors.muted}
             selectionColor={colors.sun}
             autoFocus
@@ -183,10 +194,10 @@ export function NamePrompt({ kitten, onName }: { kitten: Kitten; onName: (name: 
 // Moments rail — latest photos and notes, newest first.
 // ---------------------------------------------------------------------------
 
-export function MomentsRail({ moments, kittens, today }: { moments: Moment[]; kittens: Kitten[]; today: string }) {
+export function MomentsRail({ moments, kittens, motherName, today }: { moments: Moment[]; kittens: Kitten[]; motherName: string; today: string }) {
   const who = (m: Moment) => {
     if (m.subjectId === 'litter') return 'The litter';
-    if (m.subjectId === 'mother') return 'Juniper';
+    if (m.subjectId === 'mother') return motherName;
     const k = kittens.find((x) => x.id === m.subjectId);
     return k ? displayName(k) : '';
   };
@@ -200,12 +211,14 @@ export function MomentsRail({ moments, kittens, today }: { moments: Moment[]; ki
             onPress={() => isKitten && router.push(`/kitten/${m.subjectId}`)}
             haptics={isKitten ? 'light' : 'none'}
             pressScale={0.98}
+            accessibilityRole={isKitten ? 'button' : undefined}
+            accessibilityLabel={`${m.first ? `First: ${m.first}. ` : ''}${m.text}. ${who(m)}, ${formatRelative(m.date, today)}`}
             style={{ width: 168, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 8, gap: 8 }}>
             {m.photo ? (
-              <Image source={photos[m.photo]} contentFit="cover" style={{ width: '100%', height: 120, borderRadius: 18 }} />
+              <Image source={photoSource(m.photo)} contentFit="cover" style={{ width: '100%', height: 120, borderRadius: 18 }} />
             ) : (
               <View style={{ height: 120, borderRadius: 18, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="sparkle" size={22} color={colors.muted} />
+                <Icon name={m.kind === 'feeding' ? 'bottle' : 'sparkle'} size={22} color={colors.muted} />
               </View>
             )}
             <View style={{ paddingHorizontal: 6, paddingBottom: 4, gap: 4 }}>

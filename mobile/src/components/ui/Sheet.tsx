@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { forwardRef, useEffect, useImperativeHandle, type ReactNode } from 'react';
-import { Dimensions, Pressable as RNPressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Dimensions, Platform, Pressable as RNPressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, motion } from '@/theme/tokens';
@@ -13,8 +14,11 @@ type Props = {
   children: ReactNode;
   /** Called after the sheet has animated out. Defaults to router.back(). */
   onClosed?: () => void;
-  /** Wrap content in a ScrollView (long sheets). */
-  scroll?: boolean;
+  /**
+   * Called when the person taps the scrim, drags the sheet down or taps a Close button wired to
+   * `close()`. Return false to keep the sheet open (e.g. to confirm discarding a draft first).
+   */
+  onRequestClose?: () => boolean;
 };
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -23,8 +27,11 @@ const SCREEN_H = Dimensions.get('window').height;
  * Bottom sheet used by every quick-add / check-in route (presented as transparentModal).
  * Motion row 1: rises with spring 380/32, scrim 0 → 42% in 200 ms, drag past 120 px to dismiss.
  * Use a ref to close programmatically: sheetRef.current?.close(() => router.replace(...)).
+ *
+ * Content always scrolls. With the keyboard up, a spacer grows under the content so the sheet
+ * rises above the keyboard (up to its max height) and the focused field is scrolled into view.
  */
-export const Sheet = forwardRef<SheetHandle, Props>(function Sheet({ children, onClosed, scroll }, ref) {
+export const Sheet = forwardRef<SheetHandle, Props>(function Sheet({ children, onClosed, onRequestClose }, ref) {
   const insets = useSafeAreaInsets();
   const y = useSharedValue(SCREEN_H);
   const scrim = useSharedValue(0);
@@ -49,6 +56,15 @@ export const Sheet = forwardRef<SheetHandle, Props>(function Sheet({ children, o
     );
   };
 
+  /** Dismissals the person started — these can be vetoed by `onRequestClose`. */
+  const requestClose = () => {
+    if (onRequestClose && !onRequestClose()) {
+      y.set(withSpring(0, motion.sheet));
+      return;
+    }
+    close();
+  };
+
   useImperativeHandle(ref, () => ({ close }));
 
   const pan = Gesture.Pan()
@@ -57,29 +73,38 @@ export const Sheet = forwardRef<SheetHandle, Props>(function Sheet({ children, o
       y.value = e.translationY > 0 ? e.translationY : e.translationY * 0.15;
     })
     .onEnd((e) => {
-      if (e.translationY > motion.dismissDistance || e.velocityY > 900) runOnJS(close)();
+      if (e.translationY > motion.dismissDistance || e.velocityY > 900) runOnJS(requestClose)();
       else y.value = withSpring(0, motion.sheet);
     });
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrim.value }));
 
-  const body = (
-    <View style={{ paddingHorizontal: 20, paddingBottom: Math.max(insets.bottom, 16) + 18, gap: 20 }}>{children}</View>
-  );
+  const bottomPad = Math.max(insets.bottom, 16) + 18;
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }, scrimStyle]}>
-        <RNPressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityLabel="Close" />
+    <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }, scrimStyle]} importantForAccessibility="no-hide-descendants">
+        <RNPressable style={StyleSheet.absoluteFill} onPress={requestClose} accessible={false} />
       </Animated.View>
-      <Animated.View style={[styles.sheet, { maxHeight: SCREEN_H - insets.top - 24 }, sheetStyle]}>
+      <Animated.View style={[styles.sheet, { maxHeight: SCREEN_H - insets.top - 24 }, sheetStyle]} accessibilityViewIsModal>
         <GestureDetector gesture={pan}>
           <View style={styles.grabArea}>
             <View style={styles.grabber} />
           </View>
         </GestureDetector>
-        {scroll ? <ScrollView bounces={false} showsVerticalScrollIndicator={false}>{body}</ScrollView> : body}
+        <KeyboardAwareScrollView
+          mode="layout"
+          bottomOffset={24}
+          // The content already ends with safe-area padding, which the keyboard covers anyway.
+          extraKeyboardSpace={16 - bottomPad}
+          style={{ flexShrink: 1 }}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
+          <View style={{ paddingHorizontal: 20, paddingBottom: bottomPad, gap: 20 }}>{children}</View>
+        </KeyboardAwareScrollView>
       </Animated.View>
     </View>
   );

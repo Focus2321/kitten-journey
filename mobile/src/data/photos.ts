@@ -18,3 +18,10 @@ export const photos = {
 } satisfies Record<string, ImageSourcePropType>;
 
 export type PhotoKey = keyof typeof photos;
+
+/** A bundled photo key, or the local URI of a photo the family picked or took. */
+export type Photo = PhotoKey | (string & {});
+
+export function photoSource(photo: Photo): ImageSourcePropType {
+  return photo in photos ? photos[photo as PhotoKey] : { uri: photo };
+}

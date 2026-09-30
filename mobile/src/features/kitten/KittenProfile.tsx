@@ -1,13 +1,14 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card, GuidanceCard, Icon, IconButton, Pressable, Screen, SectionHeader, Text, type IconName } from '@/components/ui';
 import { ageLabel, ageSentence, daysBetween, formatRelative } from '@/data/dates';
-import { photos } from '@/data/photos';
+import { photoSource } from '@/data/photos';
 import { displayName, firstsFor, latestWeight, momentsFor, pronoun, useStore, weightsFor, type Kitten, type Moment } from '@/data/store';
+import { pickPhoto } from '@/features/photos/pickPhoto';
 import { colors, gutter, radius } from '@/theme/tokens';
 
 import { guidanceFor, UPCOMING_FIRSTS, weightLine } from './guidance';
@@ -24,6 +25,7 @@ export function KittenProfile({ id }: { id: string }) {
   const weights = useStore((s) => s.weights);
   const moments = useStore((s) => s.moments);
   const homes = useStore((s) => s.homes);
+  const updateKitten = useStore((s) => s.updateKitten);
   const today = useStore((s) => s.today);
   const birthDate = useStore((s) => s.birth?.date ?? null);
 
@@ -61,6 +63,25 @@ export function KittenProfile({ id }: { id: string }) {
   const age = birthDate ? ageSentence(birthDate, today) : null;
   const [ageNumber, ...ageRest] = (age ?? '').split(' ');
 
+  const changePhoto = async () => {
+    const picked = await pickPhoto({ title: `Photo of ${name}`, canRemove: kitten.photo !== null });
+    if (picked === 'remove') updateKitten(kitten.id, { photo: null });
+    else if (picked) updateKitten(kitten.id, { photo: picked });
+  };
+
+  const openMore = () => {
+    const actions = [
+      { label: 'Edit details', run: () => router.push(`/sheet/edit-kitten/${kitten.id}`) },
+      { label: kitten.photo ? 'Change photo' : 'Add a photo', run: changePhoto },
+      { label: `Share ${name}’s story`, run: () => router.push(`/share/${kitten.id}`) },
+    ];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions({ title: name, options: [...actions.map((a) => a.label), 'Cancel'], cancelButtonIndex: actions.length }, (i) => actions[i]?.run());
+      return;
+    }
+    Alert.alert(name, undefined, [...actions.map((a) => ({ text: a.label, onPress: a.run })), { text: 'Cancel', style: 'cancel' }]);
+  };
+
   const switchTo = (next: string) => {
     if (next === kitten.id) return;
     setDirection(kittens.findIndex((k) => k.id === next) >= index ? 1 : -1);
@@ -76,7 +97,7 @@ export function KittenProfile({ id }: { id: string }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: gutter, paddingTop: 8, height: 60 }}>
             <IconButton icon="back" label="Back" onPress={() => router.back()} />
             <SiblingSwitcher kittens={kittens} activeId={kitten.id} onChange={switchTo} />
-            <IconButton icon="more" label="More" />
+            <IconButton icon="more" label={`More for ${name}`} onPress={openMore} />
           </View>
         }>
         {/* Hero */}
@@ -237,7 +258,7 @@ export function KittenProfile({ id }: { id: string }) {
                   Nothing written down yet
                 </Text>
                 <Text variant="small" color={colors.muted}>
-                  Small things count. “Slept on Maya’s slipper” is a moment.
+                  Small things count. A first purr or a favourite sleeping spot is a moment.
                 </Text>
               </Card>
             )}
@@ -251,7 +272,7 @@ export function KittenProfile({ id }: { id: string }) {
               <View style={{ width: 60, height: 60 }}>
                 <View style={{ position: 'absolute', left: 6, top: 4, width: 48, height: 56, borderRadius: 12, backgroundColor: colors.pawSoft, transform: [{ rotate: '-8deg' }] }} />
                 {kitten.photo ? (
-                  <Image source={photos[kitten.photo]} contentFit="cover" style={{ position: 'absolute', left: 6, top: 2, width: 48, height: 56, borderRadius: 12, borderWidth: 3, borderColor: colors.ground, transform: [{ rotate: '5deg' }] }} />
+                  <Image source={photoSource(kitten.photo)} contentFit="cover" style={{ position: 'absolute', left: 6, top: 2, width: 48, height: 56, borderRadius: 12, borderWidth: 3, borderColor: colors.ground, transform: [{ rotate: '5deg' }] }} />
                 ) : (
                   <View style={{ position: 'absolute', left: 6, top: 2, width: 48, height: 56, borderRadius: 12, borderWidth: 3, borderColor: colors.ground, backgroundColor: colors.surface, transform: [{ rotate: '5deg' }] }} />
                 )}
@@ -365,7 +386,7 @@ function MomentRow({ moment, today }: { moment: Moment; today: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: 10, paddingLeft: 10, paddingRight: 16 }}>
       {moment.photo && !moment.first ? (
-        <Image source={photos[moment.photo]} contentFit="cover" style={{ width: 72, height: 72, borderRadius: 18 }} />
+        <Image source={photoSource(moment.photo)} contentFit="cover" style={{ width: 72, height: 72, borderRadius: 18 }} />
       ) : (
         <View style={{ width: 72, height: 72, borderRadius: 18, backgroundColor: moment.first ? colors.pawSoft : colors.ground, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="sparkle" size={28} />

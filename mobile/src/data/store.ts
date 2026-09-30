@@ -2,15 +2,15 @@ import { create } from 'zustand';
 
 import { colors } from '@/theme/tokens';
 
-import { addDays, DEMO } from './dates';
-import type { PhotoKey } from './photos';
+import { addDays, DEMO, toISO } from './dates';
+import type { Photo } from './photos';
 
 export type Phase = 'new' | 'expecting' | 'newborn' | 'growing';
 export type Sex = 'boy' | 'girl' | 'unknown';
 
 export type Mother = {
   name: string;
-  photo: PhotoKey | null;
+  photo: Photo | null;
   /** Everything below is optional — unknowns never block. */
   /** Free text, e.g. "2 years". */
   age: string | null;
@@ -28,7 +28,7 @@ export type Kitten = {
   tempColor: string;
   sex: Sex;
   coat: string;
-  photo: PhotoKey | null;
+  photo: Photo | null;
   birthTime: string | null;
   birthWeight: number | null;
   tagline: string | null;
@@ -44,7 +44,7 @@ export type Moment = {
   subjectId: SubjectId;
   date: string;
   text: string;
-  photo: PhotoKey | null;
+  photo: Photo | null;
   /** A "first" shows in the kitten's firsts rail. */
   first: string | null;
   kind: 'moment' | 'photo' | 'feeding' | 'checkin';
@@ -59,7 +59,7 @@ export type Checkin = {
   appetite: Appetite | null;
   mood: string[];
   note: string | null;
-  photo: PhotoKey | null;
+  photo: Photo | null;
 };
 
 export type TaskAction = 'mother-checkin' | 'weigh-in' | 'photo' | 'quick-add' | 'none';
@@ -68,7 +68,7 @@ export type Task = {
   id: string;
   title: string;
   subtitle: string;
-  photo: PhotoKey | null;
+  photo: Photo | null;
   icon: 'camera' | 'box' | 'scale' | 'heart' | 'bottle' | 'sparkle' | 'calendar' | null;
   done: boolean;
   action: TaskAction;
@@ -89,7 +89,9 @@ export const COLLARS = [
 
 type State = {
   phase: Phase;
-  /** Demo "today" (YYYY-MM-DD). */
+  /** True while showing the bundled demo story, whose "today" is pinned so the story reads right. */
+  demo: boolean;
+  /** Local "today" (YYYY-MM-DD). Real families follow the device clock; the demo is pinned. */
   today: string;
   owner: { name: string; child: string | null };
   mother: Mother | null;
@@ -113,10 +115,15 @@ type Actions = {
   /** Birth complete → newborn home. */
   finishBirth: () => void;
   nameKitten: (id: string, name: string) => void;
+  /** Correct details entered during onboarding. A changed birth weight updates the birth-day weigh-in. */
+  updateKitten: (id: string, patch: Partial<Omit<Kitten, 'id' | 'tempId' | 'tempColor'>>) => void;
+  /** Move "today" to the device date (no-op for the pinned demo). */
+  syncToday: () => void;
   addWeight: (kittenId: string, grams: number, date?: string) => void;
   addMoment: (m: Omit<Moment, 'id' | 'date'> & { date?: string }) => void;
   addCheckin: (c: Omit<Checkin, 'id' | 'date'> & { date?: string }) => void;
   toggleTask: (id: string) => void;
+  completeTask: (id: string) => void;
 };
 
 let seq = 0;
@@ -189,7 +196,7 @@ const PIP_MOMENTS: Moment[] = [
   { id: 'm-cuddle', subjectId: 'litter', date: '2026-11-15', text: 'Maya’s first time holding all four at once.', photo: 'cuddle', first: null, kind: 'photo' },
 ];
 
-const TASKS: Record<Exclude<Phase, 'new'>, Task[]> = {
+const DEMO_TASKS: Record<Exclude<Phase, 'new'>, Task[]> = {
   expecting: [
     { id: 't-checkin', title: 'Check in on Juniper', subtitle: 'Appetite, mood, a photo', photo: 'juniper', icon: null, done: false, action: 'mother-checkin' },
     { id: 't-bump', title: 'Weekly bump photo', subtitle: 'Same spot, same angle', photo: null, icon: 'camera', done: true, action: 'photo' },
@@ -207,8 +214,21 @@ const TASKS: Record<Exclude<Phase, 'new'>, Task[]> = {
   ],
 };
 
+/** Tasks for a phase, addressed to this family's mother rather than the demo's. */
+function tasksFor(phase: Exclude<Phase, 'new'>, mother: Mother | null): Task[] {
+  const name = mother?.name || 'her';
+  return DEMO_TASKS[phase].map((t) => ({
+    ...t,
+    done: false,
+    title: t.title.replace('Juniper', name),
+    photo: t.action === 'mother-checkin' ? (mother?.photo ?? null) : t.photo,
+    icon: t.action === 'mother-checkin' && !mother?.photo ? 'heart' : t.icon,
+  }));
+}
+
 const EMPTY: State = {
   phase: 'new',
+  demo: true,
   today: DEMO.expectingToday,
   owner: { name: 'Ana', child: 'Maya' },
   mother: null,
@@ -224,9 +244,9 @@ const EMPTY: State = {
 function demoState(phase: Phase): State {
   switch (phase) {
     case 'new':
-      return EMPTY;
+      return freshState();
     case 'expecting':
-      return { ...EMPTY, phase, mother: JUNIPER, checkins: PREGNANCY_CHECKINS, tasks: TASKS.expecting };
+      return { ...EMPTY, phase, mother: JUNIPER, checkins: PREGNANCY_CHECKINS, tasks: DEMO_TASKS.expecting };
     case 'newborn':
       return {
         ...EMPTY,
@@ -238,7 +258,7 @@ function demoState(phase: Phase): State {
         weights: demoWeights('newborn'),
         checkins: PREGNANCY_CHECKINS,
         moments: [],
-        tasks: TASKS.newborn,
+        tasks: DEMO_TASKS.newborn,
       };
     case 'growing':
       return {
@@ -251,18 +271,29 @@ function demoState(phase: Phase): State {
         weights: demoWeights('growing'),
         checkins: PREGNANCY_CHECKINS,
         moments: PIP_MOMENTS,
-        tasks: TASKS.growing,
+        tasks: DEMO_TASKS.growing,
         homes: [{ kittenId: 'pip', names: 'Sam & Rosa', movingDay: DEMO.movingDay }],
       };
   }
 }
 
+/** A real family starting from nothing, on today's date. */
+function freshState(): State {
+  return { ...EMPTY, demo: false, today: toISO(new Date()), owner: { name: '', child: null } };
+}
+
 // ---------------------------------------------------------------------------
 
 export const useStore = create<State & Actions>()((set, get) => ({
-  ...demoState('new'),
+  ...freshState(),
 
   loadDemo: (phase) => set(demoState(phase)),
+
+  syncToday: () =>
+    set((s) => {
+      const today = toISO(new Date());
+      return s.demo || s.today === today ? s : { today };
+    }),
 
   setMother: (patch) =>
     set((s) => ({
@@ -270,7 +301,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
     })),
 
   completeSetup: () =>
-    set((s) => ({ phase: 'expecting', today: s.today, tasks: s.tasks.length ? s.tasks : TASKS.expecting.map((t) => ({ ...t, done: false })) })),
+    set((s) => ({ phase: 'expecting', tasks: s.tasks.length ? s.tasks : tasksFor('expecting', s.mother) })),
 
   startBirth: (draft) => set({ birth: draft, kittens: [], weights: [] }),
 
@@ -293,9 +324,18 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   finishBirth: () =>
-    set((s) => ({ phase: 'newborn', today: s.birth?.date ?? s.today, tasks: TASKS.newborn.map((t) => ({ ...t, done: false })) })),
+    set((s) => ({ phase: 'newborn', tasks: tasksFor('newborn', s.mother) })),
 
   nameKitten: (id, name) => set((s) => ({ kittens: s.kittens.map((k) => (k.id === id ? { ...k, name } : k)) })),
+
+  updateKitten: (id, patch) =>
+    set((s) => {
+      const kittens = s.kittens.map((k) => (k.id === id ? { ...k, ...patch } : k));
+      if (!('birthWeight' in patch) || !s.birth) return { kittens };
+      const date = s.birth.date;
+      const others = s.weights.filter((w) => !(w.kittenId === id && w.date === date));
+      return { kittens, weights: patch.birthWeight ? [...others, { id: uid('w'), kittenId: id, date, grams: patch.birthWeight }] : others };
+    }),
 
   addWeight: (kittenId, grams, date) =>
     set((s) => {
@@ -308,6 +348,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
   addCheckin: ({ date, ...c }) => set((s) => ({ checkins: [...s.checkins, { id: uid('c'), date: date ?? s.today, ...c }] })),
 
   toggleTask: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
+
+  completeTask: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: true } : t)) })),
 }));
 
 // ---------------------------------------------------------------------------
