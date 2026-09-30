@@ -12,6 +12,8 @@ export type Mother = {
   name: string;
   photo: PhotoKey | null;
   /** Everything below is optional — unknowns never block. */
+  /** Free text, e.g. "2 years". */
+  age: string | null;
   matingDate: string | null;
   dueDate: string | null;
   firstLitter: boolean | null;
@@ -127,6 +129,7 @@ const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(3
 const JUNIPER: Mother = {
   name: 'Juniper',
   photo: 'juniper',
+  age: null,
   matingDate: DEMO.matingDate,
   dueDate: DEMO.dueDate,
   firstLitter: true,
@@ -230,6 +233,7 @@ function demoState(phase: Phase): State {
         phase,
         today: DEMO.newbornToday,
         mother: JUNIPER,
+        birth: { date: DEMO.birthDate, count: 4 },
         kittens: demoKittens(false),
         weights: demoWeights('newborn'),
         checkins: PREGNANCY_CHECKINS,
@@ -242,6 +246,7 @@ function demoState(phase: Phase): State {
         phase,
         today: DEMO.growingToday,
         mother: JUNIPER,
+        birth: { date: DEMO.birthDate, count: 4 },
         kittens: demoKittens(true),
         weights: demoWeights('growing'),
         checkins: PREGNANCY_CHECKINS,
@@ -261,7 +266,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
 
   setMother: (patch) =>
     set((s) => ({
-      mother: { ...(s.mother ?? { name: '', photo: null, matingDate: null, dueDate: null, firstLitter: null, vet: null }), ...patch },
+      mother: { ...(s.mother ?? { name: '', photo: null, age: null, matingDate: null, dueDate: null, firstLitter: null, vet: null }), ...patch },
     })),
 
   completeSetup: () =>

@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/ui';
+import { FamilyTab } from '@/features/kitten/FamilyTab';
 
 export default function Screen() {
-  return <ComingSoon title="Family" />;
+  return <FamilyTab />;
 }

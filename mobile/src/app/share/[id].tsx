@@ -1,5 +1,9 @@
-import { ComingSoon } from '@/components/ui';
+import { useLocalSearchParams } from 'expo-router';
 
+import { ShareStoryScreen } from '@/features/handoff/ShareStoryScreen';
+
+/** Screen 18 — choose what travels with the kitten, then create the link. */
 export default function Screen() {
-  return <ComingSoon title="Share story" />;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <ShareStoryScreen id={id} />;
 }

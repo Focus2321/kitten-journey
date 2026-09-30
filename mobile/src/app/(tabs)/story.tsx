@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/ui';
+import { StoryTab } from '@/features/story/StoryTab';
 
 export default function Screen() {
-  return <ComingSoon title="Story" />;
+  return <StoryTab />;
 }
