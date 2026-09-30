@@ -3,6 +3,7 @@ import { TextInput, View } from 'react-native';
 
 import { Avatar, Button, Icon, Pressable, Segmented, Sheet, Text, haptic, type SheetHandle } from '@/components/ui';
 import { useStore, type Sex } from '@/data/store';
+import { CollarPicker, swapNote } from '@/features/birth/CollarPicker';
 import { GRAMS_ERROR, parseGrams, parseTime, TIME_ERROR } from '@/features/birth/parse';
 import { confirmDiscard } from '@/features/photos/confirmDiscard';
 import { colors, fonts, radius } from '@/theme/tokens';
@@ -16,11 +17,14 @@ const SEXES = [
 /** Edit details — the same fields as the birth log, with the same checks, so a 4 am typo can be fixed later. */
 export function KittenEditSheet({ id }: { id: string }) {
   const sheetRef = useRef<SheetHandle>(null);
-  const kitten = useStore((s) => s.kittens.find((k) => k.id === id));
+  const kittens = useStore((s) => s.kittens);
+  const kitten = kittens.find((k) => k.id === id);
   const updateKitten = useStore((s) => s.updateKitten);
+  const setCollar = useStore((s) => s.setCollar);
 
   const [name, setName] = useState(kitten?.name ?? '');
   const [sex, setSex] = useState<Sex>(kitten?.sex ?? 'unknown');
+  const [collarId, setCollarId] = useState(kitten?.tempId ?? '');
   const [coat, setCoat] = useState(kitten?.coat ?? '');
   const [time, setTime] = useState(kitten?.birthTime ?? '');
   const [grams, setGrams] = useState(kitten?.birthWeight ? String(kitten.birthWeight) : '');
@@ -39,8 +43,9 @@ export function KittenEditSheet({ id }: { id: string }) {
   const shownError = checked ? (timeError ?? gramsError) : null;
 
   const trimmed = name.trim();
+  const others = kittens.filter((k) => k.id !== kitten.id);
   const dirty =
-    trimmed !== (kitten.name ?? '') || sex !== kitten.sex || coat.trim() !== kitten.coat || time.trim() !== (kitten.birthTime ?? '') || grams.trim() !== (kitten.birthWeight ? String(kitten.birthWeight) : '');
+    trimmed !== (kitten.name ?? '') || sex !== kitten.sex || collarId !== kitten.tempId || coat.trim() !== kitten.coat || time.trim() !== (kitten.birthTime ?? '') || grams.trim() !== (kitten.birthWeight ? String(kitten.birthWeight) : '');
 
   const save = () => {
     if (timeError || gramsError) {
@@ -53,6 +58,7 @@ export function KittenEditSheet({ id }: { id: string }) {
     // Only touch the birth weight when it changed: updating it rewrites the birth-day weigh-in.
     if (parsedGrams !== kitten.birthWeight) patch.birthWeight = parsedGrams;
     updateKitten(kitten.id, patch);
+    if (collarId !== kitten.tempId) setCollar(kitten.id, collarId);
     haptic('success');
     sheetRef.current?.close();
   };
@@ -86,11 +92,19 @@ export function KittenEditSheet({ id }: { id: string }) {
         </Pressable>
       </View>
 
-      <Field label="Name" value={name} onChange={setName} placeholder={`${kitten.tempId} Collar`} returnKey="next" onSubmit={() => coatRef.current?.focus()} words />
+      <Field label="Name" value={name} onChange={setName} placeholder={`${collarId} Collar`} returnKey="next" onSubmit={() => coatRef.current?.focus()} words />
 
       <View style={{ gap: 8 }}>
         <Text variant="label">Sex</Text>
         <Segmented options={SEXES} value={sex} onChange={setSex} />
+      </View>
+
+      <View style={{ gap: 8 }}>
+        <Text variant="label">Collar</Text>
+        <CollarPicker value={collarId} others={others} onPick={setCollarId} />
+        <Text variant="small" color={colors.muted}>
+          {swapNote(collarId, others, kitten.tempId) ?? (trimmed ? 'Their collar colour, handy until you can tell them apart.' : `Until they have a name, they’re ${collarId} Collar.`)}
+        </Text>
       </View>
 
       <Field label="Coat" inputRef={coatRef} value={coat} onChange={setCoat} placeholder="Grey tabby" returnKey="next" onSubmit={() => timeRef.current?.focus()} />

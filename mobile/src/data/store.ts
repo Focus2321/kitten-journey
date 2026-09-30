@@ -87,6 +87,35 @@ export const COLLARS = [
   { tempId: 'Yellow', color: colors.sun },
 ] as const;
 
+export type Collar = (typeof COLLARS)[number];
+
+export const collarOf = (tempId: string): Collar => COLLARS.find((c) => c.tempId === tempId) ?? COLLARS[0];
+
+/** The collar kitten `index` wears unless the family picks another: its own, else the next colour nobody wears. */
+export function collarFor(kittens: Kitten[], index: number): Collar {
+  const own = kittens[index];
+  if (own?.tempId) return collarOf(own.tempId);
+  const worn = new Set(kittens.filter((_, i) => i !== index).map((k) => k.tempId));
+  for (let i = 0; i < COLLARS.length; i++) {
+    const c = COLLARS[(index + i) % COLLARS.length];
+    if (!worn.has(c.tempId)) return c;
+  }
+  return COLLARS[index % COLLARS.length];
+}
+
+/** Put collar `tempId` on kitten `id`. Whoever wore it swaps to `id`'s previous collar, so each colour stays one kitten's. */
+function withCollar(kittens: Kitten[], id: string, tempId: string, previous: string): Kitten[] {
+  const next = collarOf(tempId);
+  const prev = collarOf(previous);
+  return kittens.map((k) =>
+    k.id === id
+      ? { ...k, tempId: next.tempId, tempColor: next.color }
+      : k.tempId === next.tempId && next.tempId !== prev.tempId
+        ? { ...k, tempId: prev.tempId, tempColor: prev.color }
+        : k,
+  );
+}
+
 type State = {
   phase: Phase;
   /** True while showing the bundled demo story, whose "today" is pinned so the story reads right. */
@@ -110,13 +139,18 @@ type Actions = {
   /** Finish onboarding → expecting home. */
   completeSetup: () => void;
   startBirth: (draft: BirthDraft) => void;
-  /** Save kitten `index` (0-based) from the birth flow. Assigns the collar ID. Returns the kitten id. */
-  saveKitten: (index: number, data: Partial<Omit<Kitten, 'id' | 'tempId' | 'tempColor'>>) => string;
+  /**
+   * Save kitten `index` (0-based) from the birth flow. Assigns `collar` (a tempId) or the default one,
+   * swapping with whichever kitten already wore it. Returns the kitten id.
+   */
+  saveKitten: (index: number, data: Partial<Omit<Kitten, 'id' | 'tempId' | 'tempColor'>>, collar?: string) => string;
   /** Birth complete → newborn home. */
   finishBirth: () => void;
   nameKitten: (id: string, name: string) => void;
   /** Correct details entered during onboarding. A changed birth weight updates the birth-day weigh-in. */
   updateKitten: (id: string, patch: Partial<Omit<Kitten, 'id' | 'tempId' | 'tempColor'>>) => void;
+  /** Change a kitten's collar; a kitten already wearing that colour takes this one's old collar. */
+  setCollar: (id: string, tempId: string) => void;
   /** Move "today" to the device date (no-op for the pinned demo). */
   syncToday: () => void;
   addWeight: (kittenId: string, grams: number, date?: string) => void;
@@ -305,15 +339,16 @@ export const useStore = create<State & Actions>()((set, get) => ({
 
   startBirth: (draft) => set({ birth: draft, kittens: [], weights: [] }),
 
-  saveKitten: (index, data) => {
-    const collar = COLLARS[index % COLLARS.length];
+  saveKitten: (index, data, collar) => {
+    const current = collarFor(get().kittens, index);
     const existing = get().kittens[index];
     const id = existing?.id ?? uid('k');
     const blank: Kitten = { id, name: null, tempId: '', tempColor: '', sex: 'unknown', coat: '', photo: null, birthTime: null, birthWeight: null, tagline: null };
-    const kitten: Kitten = { ...blank, ...existing, ...data, id, tempId: collar.tempId, tempColor: collar.color };
+    const kitten: Kitten = { ...blank, ...existing, ...data, id, tempId: current.tempId, tempColor: current.color };
     set((s) => {
-      const kittens = [...s.kittens];
-      kittens[index] = kitten;
+      const placed = [...s.kittens];
+      placed[index] = kitten;
+      const kittens = withCollar(placed, id, collar ?? current.tempId, current.tempId);
       const date = s.birth?.date ?? s.today;
       const weights = kitten.birthWeight
         ? [...s.weights.filter((w) => !(w.kittenId === id && w.date === date)), { id: uid('w'), kittenId: id, date, grams: kitten.birthWeight }]
@@ -335,6 +370,12 @@ export const useStore = create<State & Actions>()((set, get) => ({
       const date = s.birth.date;
       const others = s.weights.filter((w) => !(w.kittenId === id && w.date === date));
       return { kittens, weights: patch.birthWeight ? [...others, { id: uid('w'), kittenId: id, date, grams: patch.birthWeight }] : others };
+    }),
+
+  setCollar: (id, tempId) =>
+    set((s) => {
+      const own = s.kittens.find((k) => k.id === id);
+      return own ? { kittens: withCollar(s.kittens, id, tempId, own.tempId) } : s;
     }),
 
   addWeight: (kittenId, grams, date) =>

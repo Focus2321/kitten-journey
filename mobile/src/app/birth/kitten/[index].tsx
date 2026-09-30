@@ -6,7 +6,8 @@ import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDel
 
 import { Button, Icon, IconButton, Pressable, Screen, Segmented, Text, TopBar, haptic } from '@/components/ui';
 import { photoSource, type Photo } from '@/data/photos';
-import { COLLARS, displayName, useStore, type Sex } from '@/data/store';
+import { collarFor, collarOf, displayName, useStore, type Sex } from '@/data/store';
+import { CollarPicker, swapNote } from '@/features/birth/CollarPicker';
 import { LitterSlots, SLOT, type LitterSlotsHandle } from '@/features/birth/LitterSlots';
 import { Toast } from '@/features/birth/Toast';
 import { GRAMS_ERROR, parseGrams, parseTime, TIME_ERROR } from '@/features/birth/parse';
@@ -33,7 +34,11 @@ export default function BirthKitten() {
   const kittens = useStore((s) => s.kittens);
   const saveKitten = useStore((s) => s.saveKitten);
   const existing = kittens[index];
-  const collar = COLLARS[index % COLLARS.length];
+  // Default: their own collar, else the next colour nobody wears. Any colour can be picked instead.
+  const fallback = collarFor(kittens, index);
+  const [collarId, setCollarId] = useState<string>(fallback.tempId);
+  const collar = collarOf(collarId);
+  const others = kittens.filter((_, i) => i !== index);
   const isLast = index >= count - 1;
 
   const [photo, setPhoto] = useState<Photo | null>(existing?.photo ?? null);
@@ -102,7 +107,7 @@ export default function BirthKitten() {
       coat: coat.trim(),
       birthTime: parsedTime,
       birthWeight: parsedGrams,
-    });
+    }, collarId);
     const shown = displayName({ name: collarMode || !trimmed ? null : trimmed, tempId: collar.tempId });
     const remaining = count - index - 1;
     const toast = remaining > 0 ? `${shown}’s in · ${remaining} to go` : `${shown}’s in · that’s everyone`;
@@ -226,32 +231,17 @@ export default function BirthKitten() {
 
           <View style={{ gap: 12 }}>
             <Text variant="small" color={colors.muted}>
-              {collarMode ? 'Picked a colour — you can give them a real name anytime.' : 'No name yet? Tap a collar colour instead'}
+              {swapNote(collarId, others, fallback.tempId) ?? (collarMode ? 'Picked a colour — you can give them a real name anytime.' : 'No name yet? Tap a collar colour instead')}
             </Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {COLLARS.map((c, i) => {
-                const mine = i === index % COLLARS.length;
-                const selected = mine && collarMode;
-                return (
-                  <Pressable
-                    key={c.tempId}
-                    onPress={() => {
-                      setCollarMode(true);
-                      setName('');
-                      haptic('selection');
-                    }}
-                    haptics="none"
-                    disabled={!mine}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${c.tempId} collar`}
-                    accessibilityHint={mine ? 'Use this collar colour as a temporary name' : 'Used by another kitten in the litter'}
-                    accessibilityState={{ selected, disabled: !mine }}
-                    style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: selected ? 2.5 : 0, borderColor: colors.ink, opacity: mine ? 1 : 0.35 }}>
-                    <View style={{ width: selected ? 24 : 34, height: selected ? 24 : 34, borderRadius: 17, backgroundColor: c.color }} />
-                  </Pressable>
-                );
-              })}
-            </View>
+            <CollarPicker
+              value={collarMode ? collarId : null}
+              others={others}
+              onPick={(tempId) => {
+                setCollarId(tempId);
+                setCollarMode(true);
+                setName('');
+              }}
+            />
           </View>
 
           <Segmented options={SEX_OPTIONS} value={sex} onChange={setSex} tone="ground" />
