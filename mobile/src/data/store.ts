@@ -116,7 +116,7 @@ function withCollar(kittens: Kitten[], id: string, tempId: string, previous: str
   );
 }
 
-type State = {
+export type State = {
   phase: Phase;
   /** True while showing the bundled demo story, whose "today" is pinned so the story reads right. */
   demo: boolean;
@@ -133,8 +133,15 @@ type State = {
   homes: NewHome[];
 };
 
+/** A signed-in family's data as it comes back from Convex, in store shape (no `today`/`demo`). */
+export type Snapshot = Pick<State, 'phase' | 'owner' | 'mother' | 'birth' | 'kittens' | 'weights' | 'moments' | 'checkins' | 'tasks' | 'homes'>;
+
 type Actions = {
   loadDemo: (phase: Phase) => void;
+  /** Replace everything with the signed-in family's snapshot (`null` → a fresh real family). Leaves demo mode. */
+  hydrate: (snapshot: Snapshot | null) => void;
+  /** Back to a fresh real family on today's date — used on sign-out. */
+  reset: () => void;
   setMother: (patch: Partial<Mother>) => void;
   /** Finish onboarding → expecting home. */
   completeSetup: () => void;
@@ -322,6 +329,10 @@ export const useStore = create<State & Actions>()((set, get) => ({
   ...freshState(),
 
   loadDemo: (phase) => set(demoState(phase)),
+
+  hydrate: (snapshot) => set(snapshot ? { ...freshState(), ...snapshot } : freshState()),
+
+  reset: () => set(freshState()),
 
   syncToday: () =>
     set((s) => {

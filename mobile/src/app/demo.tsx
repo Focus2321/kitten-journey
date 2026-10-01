@@ -1,9 +1,10 @@
-import { router, type Href } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { View } from 'react-native';
 
 import { Icon, IconButton, Pressable, Screen, Text, TopBar } from '@/components/ui';
 import { DEMO } from '@/data/dates';
 import { useStore, type Phase } from '@/data/store';
+import { exitDemo } from '@/data/sync';
 import { colors, radius } from '@/theme/tokens';
 
 type Entry = { n: string; title: string; phase: Phase; href: Href; prep?: () => void };
@@ -60,15 +61,41 @@ const PHASES: { phase: Phase; label: string }[] = [
   { phase: 'growing', label: 'Growing' },
 ];
 
+/**
+ * Demo data is never synced: `loadDemo` flags every phase but 'new' as demo, so the 'new' entries flag it by hand —
+ * otherwise walking the onboarding screens from here would write into a signed-in family.
+ */
+function load(phase: Phase) {
+  s().loadDemo(phase);
+  if (phase === 'new') useStore.setState({ demo: true });
+}
+
 /** Every screen in the design, reachable in one tap, each with its demo data loaded. */
 export default function Demo() {
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const phase = useStore((st) => st.phase);
+  const demo = useStore((st) => st.demo);
+  // Arrived from the sign-in screen: the tabs aren't underneath us, so replace instead of dismissing to them.
+  const fromAuth = from === 'auth';
+
+  const goHome = (href: Href) => {
+    if (fromAuth) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace(href);
+    } else router.dismissTo(href);
+  };
 
   const open = (e: Entry) => {
-    s().loadDemo(e.phase);
+    load(e.phase);
     e.prep?.();
-    if (e.href === '/' || e.href === '/family' || e.href === '/story') router.dismissTo(e.href);
+    if (e.href === '/' || e.href === '/family' || e.href === '/story') goHome(e.href);
     else router.push(e.href);
+  };
+
+  const leave = async () => {
+    await exitDemo();
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/');
   };
 
   return (
@@ -77,9 +104,23 @@ export default function Demo() {
         <View style={{ gap: 6 }}>
           <Text variant="title">The whole journey</Text>
           <Text variant="body" color={colors.muted}>
-            Every screen from the design, with Juniper&apos;s story loaded for that moment.
+            Every screen from the design, with Juniper&apos;s story loaded for that moment. Nothing here is saved.
           </Text>
         </View>
+
+        {demo && (
+          <Pressable
+            pressScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel="Leave the demo"
+            onPress={leave}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.sun, borderRadius: radius.md, paddingVertical: 14, paddingHorizontal: 16 }}>
+            <Text variant="bodyStrong" style={{ flex: 1 }}>
+              Back to my family
+            </Text>
+            <Icon name="arrow-right" size={18} />
+          </Pressable>
+        )}
 
         <View style={{ gap: 10 }}>
           <Text variant="label">Jump to a phase</Text>
@@ -93,8 +134,8 @@ export default function Demo() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                   onPress={() => {
-                    s().loadDemo(p.phase);
-                    router.dismissTo('/');
+                    load(p.phase);
+                    goHome('/');
                   }}
                   style={{ paddingHorizontal: 16, height: 40, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: on ? colors.ink : colors.surface }}>
                   <Text variant="small" weight={700} color={on ? colors.ground : colors.ink}>

@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 import { Button, Icon, IconButton, Pressable, Screen, Segmented, StepDots, Text, TopBar } from '@/components/ui';
 import { addDays } from '@/data/dates';
 import { useStore } from '@/data/store';
+import { Gated } from '@/features/auth/Gate';
 import { duePeriod, estimatedDue, STAGE_GUESSES, type StageGuess } from '@/features/pregnancy/copy';
 import { enter } from '@/features/pregnancy/motion';
 import { SquirclePhoto } from '@/features/setup/SquirclePhoto';
@@ -34,7 +35,7 @@ function StagePill({ label, selected, onPress }: { label: string; selected: bool
   );
 }
 
-export default function SetupDetails() {
+function SetupDetails() {
   const today = useStore((s) => s.today);
   const mother = useStore((s) => s.mother);
   const setMother = useStore((s) => s.setMother);
@@ -158,5 +159,13 @@ export default function SetupDetails() {
         )}
       </Animated.View>
     </Screen>
+  );
+}
+
+export default function SetupDetailsRoute() {
+  return (
+    <Gated>
+      <SetupDetails />
+    </Gated>
   );
 }

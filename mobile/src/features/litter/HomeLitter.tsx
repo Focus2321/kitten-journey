@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { TAB_BAR_SPACE } from '@/components/TabBar';
-import { Avatar, GuidanceCard, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
+import { Avatar, GuidanceCard, IconButton, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
 import { addDays, daysBetween, formatDayMonth, formatLong } from '@/data/dates';
 import type { Photo } from '@/data/photos';
 import { latestWeight, useStore, weightBefore, weighedOn, type Task } from '@/data/store';
@@ -104,9 +104,12 @@ export function HomeLitter() {
             Today
           </Text>
         </View>
-        <Pressable onPress={() => router.push('/sheet/mother-checkin')} accessibilityRole="button" accessibilityLabel={`Check in on ${motherName}`}>
-          <Avatar photo={mother?.photo} size={44} shape="squircle" ring={colors.paw} ringWidth={2} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <IconButton icon="person" label="Account" size={40} onPress={() => router.push('/account')} />
+          <Pressable onPress={() => router.push('/sheet/mother-checkin')} accessibilityRole="button" accessibilityLabel={`Check in on ${motherName}`}>
+            <Avatar photo={mother?.photo} size={44} shape="squircle" ring={colors.paw} ringWidth={2} />
+          </Pressable>
+        </View>
       </View>
 
       <Hero photoKeys={heroPhotos} pill={growing ? `Growing · week ${week}` : days === 0 ? 'Newborns · born today' : `Newborns · day ${days}`} dot={growing ? colors.sun : colors.paw} />

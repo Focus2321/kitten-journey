@@ -29,7 +29,8 @@ export type IconName =
   | 'pencil'
   | 'lock'
   | 'link'
-  | 'people';
+  | 'people'
+  | 'person';
 
 type Props = { name: IconName; size?: number; color?: string; strokeWidth?: number };
 
@@ -163,6 +164,13 @@ function paths(name: IconName, s: object, color: string) {
           <Circle cx={8.5} cy={9} r={3} {...s} />
           <Circle cx={16.5} cy={9} r={3} {...s} />
           <Path d="M3 19c.6-3 2.8-4.5 5.5-4.5S13.4 16 14 19M13 14.8c1-.5 2.2-.8 3.5-.3 2 .6 3.2 2.1 3.5 4.5" {...s} />
+        </>
+      );
+    case 'person':
+      return (
+        <>
+          <Circle cx={12} cy={8.5} r={3.5} {...s} />
+          <Path d="M5 20c.7-3.6 3.4-5.5 7-5.5s6.3 1.9 7 5.5" {...s} />
         </>
       );
   }

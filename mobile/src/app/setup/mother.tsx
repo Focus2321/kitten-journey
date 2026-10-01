@@ -6,12 +6,13 @@ import Animated from 'react-native-reanimated';
 import { Button, IconButton, IconButtonSpacer, Screen, StepDots, Text, TopBar } from '@/components/ui';
 import type { Photo } from '@/data/photos';
 import { useStore } from '@/data/store';
+import { Gated } from '@/features/auth/Gate';
 import { enter } from '@/features/pregnancy/motion';
 import { pickPhoto } from '@/features/photos/pickPhoto';
 import { SquirclePhoto } from '@/features/setup/SquirclePhoto';
 import { colors, fonts } from '@/theme/tokens';
 
-export default function SetupMother() {
+function SetupMother() {
   const { flow } = useLocalSearchParams<{ flow?: string }>();
   const mother = useStore((s) => s.mother);
   const setMother = useStore((s) => s.setMother);
@@ -98,5 +99,13 @@ export default function SetupMother() {
         <View style={{ width: 200, height: 2, backgroundColor: colors.ink, borderRadius: 1 }} />
       </Animated.View>
     </Screen>
+  );
+}
+
+export default function SetupMotherRoute() {
+  return (
+    <Gated>
+      <SetupMother />
+    </Gated>
   );
 }

@@ -39,7 +39,8 @@
           "photosPermission": "Kitten Journey uses your photos so you can add them to your cats' story.",
           "cameraPermission": "Kitten Journey uses the camera so you can take photos for your cats' story."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": false,

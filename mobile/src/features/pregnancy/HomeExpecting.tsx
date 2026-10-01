@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { TAB_BAR_SPACE } from '@/components/TabBar';
-import { Avatar, Card, GuidanceCard, Icon, PhotoPill, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
+import { Avatar, Card, GuidanceCard, Icon, IconButton, PhotoPill, Pressable, Screen, SectionHeader, StageProgress, TaskRow, Text } from '@/components/ui';
 import { formatDayMonth, formatLong } from '@/data/dates';
 import { photoSource, type Photo } from '@/data/photos';
 import { useStore, type Appetite, type Task } from '@/data/store';
@@ -148,15 +148,18 @@ export function HomeExpecting() {
             Today
           </Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/journal')}
-          onLongPress={() => router.push('/demo')}
-          delayLongPress={600}
-          haptics="none"
-          accessibilityRole="button"
-          accessibilityLabel={`${name}'s journal`}>
-          <Avatar photo={mother?.photo} size={44} shape="squircle" ring={colors.paw} ringWidth={2} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <IconButton icon="person" label="Account" size={40} onPress={() => router.push('/account')} />
+          <Pressable
+            onPress={() => router.push('/journal')}
+            onLongPress={() => router.push('/demo')}
+            delayLongPress={600}
+            haptics="none"
+            accessibilityRole="button"
+            accessibilityLabel={`${name}'s journal`}>
+            <Avatar photo={mother?.photo} size={44} shape="squircle" ring={colors.paw} ringWidth={2} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Hero */}

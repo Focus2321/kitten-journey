@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 import { Icon, Pressable, Text, type IconName } from '@/components/ui';
 import { photos } from '@/data/photos';
 import { useStore } from '@/data/store';
+import { Gated } from '@/features/auth/Gate';
 import { enter } from '@/features/pregnancy/motion';
 import { colors, gutter, radius } from '@/theme/tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,12 +42,15 @@ function Choice({ title, subtitle, icon, tone, onPress }: { title: string; subti
   );
 }
 
-export default function Welcome() {
+function Welcome() {
   const insets = useSafeAreaInsets();
   const loadDemo = useStore((s) => s.loadDemo);
+  const demo = useStore((s) => s.demo);
 
   const startSetup = (flow: 'expecting' | 'born') => {
     loadDemo('new');
+    // Walking onboarding from the demo screen stays a demo: nothing typed here may reach a signed-in family.
+    if (demo) useStore.setState({ demo: true });
     router.push(flow === 'born' ? { pathname: '/setup/mother', params: { flow } } : '/setup/mother');
   };
 
@@ -111,5 +115,14 @@ export default function Welcome() {
         </Pressable>
       </Animated.View>
     </View>
+  );
+}
+
+/** First screen for a signed-in family with nothing recorded yet; signed-out people are sent to sign in. */
+export default function WelcomeRoute() {
+  return (
+    <Gated>
+      <Welcome />
+    </Gated>
   );
 }

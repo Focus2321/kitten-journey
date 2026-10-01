@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { TAB_BAR_SPACE } from '@/components/TabBar';
-import { Avatar, Card, Icon, PhotoPill, Pressable, Screen, Text } from '@/components/ui';
+import { Avatar, Card, Icon, IconButton, PhotoPill, Pressable, Screen, Text } from '@/components/ui';
 import { ageLabel, ageSentence, formatShort, pregnancyWeek } from '@/data/dates';
 import { photoSource } from '@/data/photos';
 import { displayName, latestWeight, useStore, type Kitten } from '@/data/store';
@@ -32,9 +32,12 @@ export function FamilyTab() {
 
   return (
     <Screen bottomInset={TAB_BAR_SPACE}>
-      <View style={{ paddingTop: 8, gap: 2 }}>
-        <Text variant="label">{eyebrow}</Text>
-        <Text variant="headline">Family</Text>
+      <View style={{ paddingTop: 8, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="label">{eyebrow}</Text>
+          <Text variant="headline">Family</Text>
+        </View>
+        <IconButton icon="person" label="Account" size={40} onPress={() => router.push('/account')} />
       </View>
 
       {mother && (
